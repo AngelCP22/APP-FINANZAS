@@ -179,7 +179,10 @@ function renderAccounts() {
     return `<div class="account-card" style="background:linear-gradient(135deg,${bank.color},${bank.color}cc)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div><div class="account-name">${a.name}</div><div class="account-type">${bank.name} · ${ACCOUNT_TYPES.find(t=>t.id===a.type)?.name||a.type}</div></div>
-        <button onclick="deleteAccount('${a.id}')" style="background:rgba(255,255,255,0.15);border-radius:8px;padding:4px 8px;color:white;font-size:12px">✕</button>
+        <div style="display:flex;gap:6px">
+          <button onclick="openEditAccountModal('${a.id}')" style="background:rgba(255,255,255,0.15);border-radius:8px;padding:4px 8px;color:white;font-size:12px">✏️</button>
+          <button onclick="deleteAccount('${a.id}')" style="background:rgba(255,255,255,0.15);border-radius:8px;padding:4px 8px;color:white;font-size:12px">✕</button>
+        </div>
       </div>
       ${isC?'':` <div class="account-balance">${fmt(bal)}</div>`}
       ${creditHtml}
@@ -197,6 +200,82 @@ function renderAccounts() {
   }).join('')}</div>`:`<div class="empty"><div class="empty-icon">⇄</div><div class="empty-text">Sin transferencias</div></div>`;
 }
 function deleteAccount(id){if(!confirm('¿Eliminar esta cuenta?'))return;state.accounts=state.accounts.filter(a=>a.id!==id);saveState();renderAccounts();}
+
+// ===== EDITAR CUENTA =====
+function openEditAccountModal(id) {
+  const a = state.accounts.find(x=>x.id===id);
+  if(!a) return;
+  const bankOpts = BANKS.map(b=>`<option value="${b.id}"${b.id===a.bankId?' selected':''}>${b.name}</option>`).join('');
+  const typeOpts = ACCOUNT_TYPES.map(t=>`<option value="${t.id}"${t.id===a.type?' selected':''}>${t.name}</option>`).join('');
+  const creditHtml = a.type==='credit' ? `
+    <div id="ea-credit-fields">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Límite crédito</label><input class="form-input" id="ea-credit-limit" type="number" value="${a.creditLimit||0}"/></div>
+        <div class="form-group"><label class="form-label">Usado actualmente</label><input class="form-input" id="ea-credit-used" type="number" value="${a.creditUsed||0}"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Día de corte</label><input class="form-input" id="ea-cut-day" type="number" value="${a.cutDay||''}" min="1" max="31"/></div>
+        <div class="form-group"><label class="form-label">Día de pago</label><input class="form-input" id="ea-pay-day" type="number" value="${a.payDay||''}" min="1" max="31"/></div>
+      </div>
+    </div>` : '<div id="ea-credit-fields" style="display:none"></div>';
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar cuenta</div>
+    <div class="form-group"><label class="form-label">Nombre</label>
+      <input class="form-input" id="ea-name" value="${a.name}"/>
+    </div>
+    <div class="form-group"><label class="form-label">Banco / Billetera</label>
+      <select class="form-select" id="ea-bank">${bankOpts}</select>
+    </div>
+    <div class="form-group"><label class="form-label">Tipo</label>
+      <select class="form-select" id="ea-type" onchange="onEditAccTypeChange()">${typeOpts}</select>
+    </div>
+    <div class="form-group"><label class="form-label">Saldo inicial</label>
+      <input class="form-input" id="ea-balance" type="number" value="${a.initialBalance||0}" inputmode="decimal"/>
+    </div>
+    ${creditHtml}
+    <button class="btn-primary" onclick="saveEditAccount('${id}', this.closest('.modal-overlay'))">Guardar cambios</button>
+    <button class="btn-danger" style="margin-top:8px" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+  </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function onEditAccTypeChange() {
+  const type = document.getElementById('ea-type')?.value;
+  const fields = document.getElementById('ea-credit-fields');
+  if(!fields) return;
+  fields.style.display = type==='credit' ? '' : 'none';
+  if(type==='credit' && !fields.innerHTML.trim()) {
+    fields.innerHTML = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Límite crédito</label><input class="form-input" id="ea-credit-limit" type="number" placeholder="0.00"/></div>
+        <div class="form-group"><label class="form-label">Usado actualmente</label><input class="form-input" id="ea-credit-used" type="number" placeholder="0.00"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Día de corte</label><input class="form-input" id="ea-cut-day" type="number" placeholder="15" min="1" max="31"/></div>
+        <div class="form-group"><label class="form-label">Día de pago</label><input class="form-input" id="ea-pay-day" type="number" placeholder="5" min="1" max="31"/></div>
+      </div>`;
+  }
+}
+
+function saveEditAccount(id, overlay) {
+  const a = state.accounts.find(x=>x.id===id);
+  if(!a) return;
+  a.name           = document.getElementById('ea-name')?.value.trim() || a.name;
+  a.bankId         = document.getElementById('ea-bank')?.value;
+  a.type           = document.getElementById('ea-type')?.value;
+  a.initialBalance = parseFloat(document.getElementById('ea-balance')?.value||0);
+  if(a.type==='credit') {
+    a.creditLimit = parseFloat(document.getElementById('ea-credit-limit')?.value||0);
+    a.creditUsed  = parseFloat(document.getElementById('ea-credit-used')?.value||0);
+    a.cutDay      = document.getElementById('ea-cut-day')?.value;
+    a.payDay      = document.getElementById('ea-pay-day')?.value;
+  }
+  saveState(); overlay.remove(); renderAccounts();
+}
 function openModalTxForAccount(accountId,type){openModal('modal-add-tx');setTimeout(()=>{document.getElementById('tx-type-'+type)?.click();const s=document.getElementById('tx-account');if(s)s.value=accountId;},100);}
 
 function renderModalAddTx() {
@@ -267,15 +346,87 @@ function txItem(t){
   const cat=getCatById(t.type,t.category),dateStr=new Date(t.date).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
   return `<div class="tx-item">
     <div class="tx-icon" style="background:${t.type==='income'?'rgba(74,222,128,0.15)':'rgba(248,113,113,0.15)'}">${cat.emoji}</div>
-    <div class="tx-info">
+    <div class="tx-info" onclick="openEditTxModal('${t.id}')" style="cursor:pointer">
       <div class="tx-name">${t.description}</div>
       <div class="tx-meta">${dateStr}${bank?`<span class="bank-chip" style="background:${bank.color}">${bank.name.slice(0,3)}</span>`:''}${t.reimbursable&&!t.reimbursed?`<span class="reimb-tag">Reembolsable</span>`:''}${t.isExtra?`<span class="tx-badge">Extra</span>`:''}</div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px">
+    <div style="display:flex;align-items:center;gap:4px">
       <div class="tx-amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</div>
+      <button class="tx-delete" style="background:rgba(108,99,255,0.12);color:var(--accent)" onclick="openEditTxModal('${t.id}')">✏️</button>
       <button class="tx-delete" onclick="deleteTx('${t.id}')">🗑</button>
     </div>
   </div>`;
+}
+
+// ===== EDITAR TRANSACCIÓN =====
+function openEditTxModal(id) {
+  const t = state.transactions.find(x=>x.id===id);
+  if(!t) return;
+  const accOptions = state.accounts.map(a=>`<option value="${a.id}"${a.id===t.accountId?' selected':''}>${a.name}</option>`).join('');
+  const buildCatOpts = (type) => state.categories[type].map(c=>`<option value="${c.id}"${c.id===t.category?' selected':''}>${c.emoji} ${c.name}</option>`).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar movimiento</div>
+    <div class="type-selector">
+      <button class="type-btn income${t.type==='income'?' selected':''}" id="edit-tx-income" onclick="editSelectType('income')">💚 Ingreso</button>
+      <button class="type-btn expense${t.type==='expense'?' selected':''}" id="edit-tx-expense" onclick="editSelectType('expense')">❤️ Gasto</button>
+    </div>
+    <div class="form-group"><label class="form-label">Descripción</label>
+      <input class="form-input" id="edit-tx-desc" value="${t.description}"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Monto</label>
+        <input class="form-input" id="edit-tx-amount" type="number" value="${t.amount}" inputmode="decimal"/>
+      </div>
+      <div class="form-group"><label class="form-label">Fecha</label>
+        <input class="form-input" id="edit-tx-date" type="date" value="${t.date}"/>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Categoría</label>
+      <select class="form-select" id="edit-tx-category">
+        ${buildCatOpts(t.type)}
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Cuenta</label>
+      <select class="form-select" id="edit-tx-account">
+        <option value="">Sin cuenta</option>${accOptions}
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Nota</label>
+      <input class="form-input" id="edit-tx-note" value="${t.note||''}" placeholder="Nota opcional..."/>
+    </div>
+    <button class="btn-primary" onclick="saveEditTx('${id}', this.closest('.modal-overlay'))">Guardar cambios</button>
+    <button class="btn-danger" style="margin-top:8px" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+  </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function editSelectType(type) {
+  document.getElementById('edit-tx-income')?.classList.toggle('selected', type==='income');
+  document.getElementById('edit-tx-expense')?.classList.toggle('selected', type==='expense');
+  const sel = document.getElementById('edit-tx-category');
+  if(sel) sel.innerHTML = state.categories[type].map(c=>`<option value="${c.id}">${c.emoji} ${c.name}</option>`).join('');
+}
+
+function saveEditTx(id, overlay) {
+  const t = state.transactions.find(x=>x.id===id);
+  if(!t) return;
+  const desc = document.getElementById('edit-tx-desc')?.value.trim();
+  const amount = parseFloat(document.getElementById('edit-tx-amount')?.value);
+  const date = document.getElementById('edit-tx-date')?.value;
+  if(!desc||!amount||amount<=0||!date) { alert('Completa todos los campos requeridos'); return; }
+  t.type        = document.getElementById('edit-tx-income')?.classList.contains('selected') ? 'income' : 'expense';
+  t.description = desc;
+  t.amount      = amount;
+  t.date        = date;
+  t.category    = document.getElementById('edit-tx-category')?.value;
+  t.accountId   = document.getElementById('edit-tx-account')?.value;
+  t.note        = document.getElementById('edit-tx-note')?.value;
+  saveState(); overlay.remove(); renderCurrentScreen();
 }
 
 function renderModalAddAccount(){
@@ -419,6 +570,7 @@ function debtCard(d) {
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <span class="debt-status ${status}">${statusTxt}</span>
+        <button onclick="openEditDebtModal('${d.id}')" style="background:rgba(108,99,255,0.12);border-radius:6px;padding:4px 8px;color:var(--accent);font-size:12px">✏️</button>
         <button onclick="deleteDebt('${d.id}')" style="background:rgba(248,113,113,0.1);border-radius:6px;padding:4px 8px;color:var(--red);font-size:12px">✕</button>
       </div>
     </div>
@@ -434,6 +586,70 @@ function deleteDebt(id) {
   if(!confirm('¿Eliminar esta deuda?')) return;
   state.debts = state.debts.filter(d=>d.id!==id);
   saveState(); renderDebts();
+}
+
+// ===== EDITAR DEUDA =====
+function openEditDebtModal(id) {
+  const d = state.debts.find(x=>x.id===id);
+  if(!d) return;
+  let extraFields = '';
+  if(d.type==='card') {
+    extraFields = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Límite de crédito</label><input class="form-input" id="ed-limit" type="number" value="${d.limit||0}"/></div>
+        <div class="form-group"><label class="form-label">Monto usado</label><input class="form-input" id="ed-used" type="number" value="${d.used||0}"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Día de corte</label><input class="form-input" id="ed-cut" type="number" value="${d.cutDay||''}" min="1" max="31"/></div>
+        <div class="form-group"><label class="form-label">Día de pago</label><input class="form-input" id="ed-pay" type="number" value="${d.payDay||''}" min="1" max="31"/></div>
+      </div>`;
+  } else {
+    extraFields = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Monto total</label><input class="form-input" id="ed-amount" type="number" value="${d.amount||0}"/></div>
+        <div class="form-group"><label class="form-label">Saldo restante</label><input class="form-input" id="ed-remaining" type="number" value="${d.remaining||0}"/></div>
+      </div>
+      ${d.type==='loan'?`<div class="form-group"><label class="form-label">Cuota mensual</label><input class="form-input" id="ed-monthly" type="number" value="${d.monthlyPayment||0}"/></div>`:''}`;
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar: ${d.name}</div>
+    <div class="form-group"><label class="form-label">Nombre</label>
+      <input class="form-input" id="ed-name" value="${d.name}"/>
+    </div>
+    ${extraFields}
+    <div class="form-group"><label class="form-label">Fecha de vencimiento</label>
+      <input class="form-input" id="ed-due" type="date" value="${d.dueDate||''}"/>
+    </div>
+    <div class="form-group"><label class="form-label">Nota</label>
+      <input class="form-input" id="ed-note" value="${d.note||''}" placeholder="Entidad, tasa, etc..."/>
+    </div>
+    <button class="btn-primary" onclick="saveEditDebt('${id}', this.closest('.modal-overlay'))">Guardar cambios</button>
+    <button class="btn-danger" style="margin-top:8px" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+  </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function saveEditDebt(id, overlay) {
+  const d = state.debts.find(x=>x.id===id);
+  if(!d) return;
+  d.name    = document.getElementById('ed-name')?.value.trim() || d.name;
+  d.dueDate = document.getElementById('ed-due')?.value;
+  d.note    = document.getElementById('ed-note')?.value;
+  if(d.type==='card') {
+    d.limit  = parseFloat(document.getElementById('ed-limit')?.value||0);
+    d.used   = parseFloat(document.getElementById('ed-used')?.value||0);
+    d.cutDay = document.getElementById('ed-cut')?.value;
+    d.payDay = document.getElementById('ed-pay')?.value;
+  } else {
+    d.amount    = parseFloat(document.getElementById('ed-amount')?.value||0);
+    d.remaining = parseFloat(document.getElementById('ed-remaining')?.value||0);
+    if(d.type==='loan') d.monthlyPayment = parseFloat(document.getElementById('ed-monthly')?.value||0);
+  }
+  saveState(); overlay.remove(); renderDebts();
 }
 
 function markReimbursed(txId) {
@@ -591,6 +807,7 @@ function renderGoals() {
             <div class="goal-subtitle">${g.description||''}</div>
           </div>
         </div>
+        <button onclick="openEditGoalModal('${g.id}')" style="background:rgba(108,99,255,0.12);border-radius:6px;padding:4px 8px;color:var(--accent);font-size:12px;margin-right:4px">✏️</button>
         <button onclick="deleteGoal('${g.id}')" style="background:rgba(248,113,113,0.1);border-radius:6px;padding:4px 8px;color:var(--red);font-size:12px">✕</button>
       </div>
       ${bankTags?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0">${bankTags}</div>`:''}
@@ -612,6 +829,70 @@ function deleteGoal(id) {
   if(!confirm('¿Eliminar esta meta?')) return;
   state.goals = state.goals.filter(g=>g.id!==id);
   saveState(); renderGoals();
+}
+
+// ===== EDITAR META =====
+function openEditGoalModal(id) {
+  const g = state.goals.find(x=>x.id===id);
+  if(!g) return;
+  const accOpts = state.accounts.map(a=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" value="${a.id}" ${(g.bankIds||[]).includes(a.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)">
+      <span style="font-size:14px">${a.name}</span>
+    </label>`).join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar meta</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Emoji</label>
+        <input class="form-input" id="eg-emoji" value="${g.emoji||'🎯'}" maxlength="2" style="font-size:22px;text-align:center"/>
+      </div>
+      <div class="form-group" style="flex:3"><label class="form-label">Nombre</label>
+        <input class="form-input" id="eg-name" value="${g.name}"/>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Descripción</label>
+      <input class="form-input" id="eg-desc" value="${g.description||''}"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Monto objetivo</label>
+        <input class="form-input" id="eg-target" type="number" value="${g.target}" inputmode="decimal"/>
+      </div>
+      <div class="form-group"><label class="form-label">Ya ahorrado</label>
+        <input class="form-input" id="eg-saved" type="number" value="${g.saved||0}" inputmode="decimal"/>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Fecha límite</label>
+      <input class="form-input" id="eg-deadline" type="date" value="${g.deadline||''}"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cuentas asignadas</label>
+      <div style="background:var(--card);border-radius:var(--radius-sm);border:1px solid var(--border);padding:8px 12px">
+        ${accOpts||'<div style="font-size:13px;color:var(--text2)">Sin cuentas</div>'}
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveEditGoal('${id}', this.closest('.modal-overlay'))">Guardar cambios</button>
+    <button class="btn-danger" style="margin-top:8px" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+  </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function saveEditGoal(id, overlay) {
+  const g = state.goals.find(x=>x.id===id);
+  if(!g) return;
+  const target = parseFloat(document.getElementById('eg-target')?.value);
+  if(!target||target<=0) { alert('Ingresa un monto objetivo válido'); return; }
+  g.emoji       = document.getElementById('eg-emoji')?.value || '🎯';
+  g.name        = document.getElementById('eg-name')?.value.trim() || g.name;
+  g.description = document.getElementById('eg-desc')?.value;
+  g.target      = target;
+  g.saved       = parseFloat(document.getElementById('eg-saved')?.value||0);
+  g.deadline    = document.getElementById('eg-deadline')?.value;
+  g.bankIds     = [...overlay.querySelectorAll('input[type=checkbox]:checked')].map(cb=>cb.value);
+  saveState(); overlay.remove(); renderGoals();
 }
 
 // ===== MODAL: AGREGAR META =====
@@ -686,7 +967,10 @@ function renderFixedExpenses() {
         </div>
         <button class="pay-btn" onclick="payFixedExpense('${f.id}')">Pagar ahora</button>
       </div>
-      <button onclick="deleteFixed('${f.id}')" style="background:rgba(248,113,113,0.1);border-radius:6px;padding:4px 6px;color:var(--red);font-size:12px;margin-left:4px">✕</button>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-left:4px">
+        <button onclick="openEditFixedModal('${f.id}')" style="background:rgba(108,99,255,0.12);border-radius:6px;padding:4px 6px;color:var(--accent);font-size:12px">✏️</button>
+        <button onclick="deleteFixed('${f.id}')" style="background:rgba(248,113,113,0.1);border-radius:6px;padding:4px 6px;color:var(--red);font-size:12px">✕</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -708,6 +992,67 @@ function deleteFixed(id) {
   if(!confirm('¿Eliminar este gasto fijo?')) return;
   state.fixedExpenses = state.fixedExpenses.filter(f=>f.id!==id);
   saveState(); renderMore();
+}
+
+// ===== EDITAR GASTO FIJO =====
+function openEditFixedModal(id) {
+  const f = state.fixedExpenses.find(x=>x.id===id);
+  if(!f) return;
+  const accOpts = state.accounts.map(a=>`<option value="${a.id}"${a.id===f.accountId?' selected':''}>${a.name}</option>`).join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar gasto fijo</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Emoji</label>
+        <input class="form-input" id="ef-emoji" value="${f.emoji||'📋'}" maxlength="2" style="font-size:22px;text-align:center"/>
+      </div>
+      <div class="form-group" style="flex:3"><label class="form-label">Nombre</label>
+        <input class="form-input" id="ef-name" value="${f.name}"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Monto mensual</label>
+        <input class="form-input" id="ef-amount" type="number" value="${f.amount}" inputmode="decimal"/>
+      </div>
+      <div class="form-group"><label class="form-label">Día de cobro</label>
+        <input class="form-input" id="ef-day" type="number" value="${f.day}" min="1" max="31"/>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Teléfono / N° cuenta servicio</label>
+      <input class="form-input" id="ef-phone" value="${f.phone||''}" placeholder="Opcional"/>
+    </div>
+    <div class="form-group"><label class="form-label">Titular</label>
+      <input class="form-input" id="ef-holder" value="${f.holder||''}" placeholder="Opcional"/>
+    </div>
+    <div class="form-group"><label class="form-label">Cuenta bancaria para débito</label>
+      <select class="form-select" id="ef-account">
+        <option value="">Sin cuenta</option>${accOpts}
+      </select>
+    </div>
+    <button class="btn-primary" onclick="saveEditFixed('${id}', this.closest('.modal-overlay'))">Guardar cambios</button>
+    <button class="btn-danger" style="margin-top:8px" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+  </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function saveEditFixed(id, overlay) {
+  const f = state.fixedExpenses.find(x=>x.id===id);
+  if(!f) return;
+  const amount = parseFloat(document.getElementById('ef-amount')?.value);
+  const day    = parseInt(document.getElementById('ef-day')?.value);
+  if(!amount||amount<=0) { alert('Ingresa un monto válido'); return; }
+  if(!day||day<1||day>31) { alert('Ingresa un día válido (1-31)'); return; }
+  f.emoji     = document.getElementById('ef-emoji')?.value || '📋';
+  f.name      = document.getElementById('ef-name')?.value.trim() || f.name;
+  f.amount    = amount;
+  f.day       = day;
+  f.phone     = document.getElementById('ef-phone')?.value;
+  f.holder    = document.getElementById('ef-holder')?.value;
+  f.accountId = document.getElementById('ef-account')?.value;
+  saveState(); overlay.remove(); renderMore();
 }
 
 // ===== MODAL: GASTO FIJO =====
