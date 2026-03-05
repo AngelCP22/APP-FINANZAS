@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2d1b69"/>
+      <stop offset="100%" stop-color="#1a0f3c"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#6C63FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="p1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#6C63FF"/>
+    </linearGradient>
+    <linearGradient id="p2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <filter id="gf" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+  <!-- Glow ambiental -->
+  <circle cx="256" cy="230" r="160" fill="url(#glow)"/>
+
+  <!-- 8 pétalos -->
+  <g transform="translate(256,220)">
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p1)" transform="rotate(0)"   opacity="1"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p2)" transform="rotate(45)"  opacity="0.85"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p1)" transform="rotate(90)"  opacity="1"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p2)" transform="rotate(135)" opacity="0.85"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p1)" transform="rotate(180)" opacity="1"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p2)" transform="rotate(225)" opacity="0.85"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p1)" transform="rotate(270)" opacity="1"/>
+    <ellipse cx="0" cy="-78" rx="20" ry="54" fill="url(#p2)" transform="rotate(315)" opacity="0.85"/>
+    <!-- Centro -->
+    <circle cx="0" cy="0" r="28" fill="#7c3aed"/>
+    <circle cx="0" cy="0" r="16" fill="#1a0f3c"/>
+    <circle cx="0" cy="0" r="8"  fill="#c4b5fd"/>
+  </g>
+
+  <!-- Texto -->
+  <text x="256" y="405" text-anchor="middle"
+        font-family="Arial Rounded MT Bold, Arial, sans-serif"
+        font-size="52" font-weight="800" fill="#e9d5ff" letter-spacing="-1">FinControl</text>
+  <text x="256" y="435" text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="16" fill="#8b5cf6" letter-spacing="3.5">FINANZAS PERSONALES</text>
+</svg>
