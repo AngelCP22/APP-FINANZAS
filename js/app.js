@@ -20,6 +20,112 @@ let state = {
   currentScreen: 'home', currentStatTab: 'current'
 };
 
+// ============================================================
+// ===== ROJO 2: NOTIFICACIONES PUSH ==========================
+// ============================================================
+let swRegistration = null;
+
+async function initNotifications() {
+  if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+  try {
+    swRegistration = await navigator.serviceWorker.register('sw.js');
+    // Si ya tiene permiso, programar notificaciones
+    if (Notification.permission === 'granted') scheduleAllNotifications();
+  } catch(e) { console.warn('SW no disponible:', e); }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('Tu navegador no soporta notificaciones.');
+    return false;
+  }
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') {
+    alert('Las notificaciones están bloqueadas. Actívalas desde la configuración de tu navegador.');
+    return false;
+  }
+  const perm = await Notification.requestPermission();
+  return perm === 'granted';
+}
+
+function scheduleAllNotifications() {
+  if (!swRegistration || Notification.permission !== 'granted') return;
+  const today = new Date();
+
+  // 1. Gastos fijos próximos (vencen en ≤3 días)
+  state.fixedExpenses.forEach(f => {
+    const dueDay = Number(f.day);
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+    const diffDays = Math.ceil((dueDate - today) / 86400000);
+    if (diffDays >= 0 && diffDays <= 3) {
+      const delay = diffDays === 0 ? 5000 : diffDays * 86400000;
+      sendToSW('SCHEDULE_NOTIFICATION', {
+        title: `⏰ Pago próximo: ${f.name}`,
+        body: `Vence ${diffDays === 0 ? 'hoy' : `en ${diffDays} día${diffDays>1?'s':''}`} · ${state.config.currency} ${Number(f.amount).toFixed(2)}`,
+        delay
+      });
+    }
+  });
+
+  // 2. Deudas vencidas
+  state.debts.filter(d => d.dueDate).forEach(d => {
+    if (new Date(d.dueDate) < today && d.status !== 'paid') {
+      sendToSW('SCHEDULE_NOTIFICATION', {
+        title: `🔴 Deuda vencida: ${d.name}`,
+        body: `Esta deuda ya venció. Revisa tu situación financiera.`,
+        delay: 3000
+      });
+    }
+  });
+
+  // 3. Recordatorio diario a las 9pm
+  scheduleDailyReminder();
+}
+
+function scheduleDailyReminder() {
+  const now = new Date();
+  const next9pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 0, 0);
+  if (now >= next9pm) next9pm.setDate(next9pm.getDate() + 1);
+  const delay = next9pm - now;
+  sendToSW('SCHEDULE_NOTIFICATION', {
+    title: '📊 FinControl · Registro diario',
+    body: '¿Registraste todos tus gastos de hoy?',
+    delay
+  });
+}
+
+function sendToSW(type, data) {
+  if (!swRegistration?.active) return;
+  swRegistration.active.postMessage({ type, ...data });
+}
+
+async function toggleDailyReminder() {
+  const enabled = state.config.dailyReminder;
+  if (!enabled) {
+    const ok = await requestNotificationPermission();
+    if (!ok) return;
+    state.config.dailyReminder = true;
+    saveState();
+    scheduleAllNotifications();
+    alert('✅ Recordatorio diario activado para las 9pm');
+  } else {
+    state.config.dailyReminder = false;
+    saveState();
+    alert('🔕 Recordatorio desactivado');
+  }
+  renderModalConfig();
+}
+
+async function testNotification() {
+  const ok = await requestNotificationPermission();
+  if (!ok) return;
+  sendToSW('SCHEDULE_NOTIFICATION', {
+    title: '✅ FinControl · Notificaciones activas',
+    body: 'Las notificaciones funcionan correctamente.',
+    delay: 500
+  });
+}
+
 // ===== TIPO DE CAMBIO =====
 let exchangeRate = { pen: null, lastUpdate: null };
 
@@ -1398,6 +1504,27 @@ function renderModalConfig() {
       ${renderCategoryConfig()}
     </div>
 
+    <!-- NOTIFICACIONES -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">🔔 Notificaciones</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--card2);border-radius:12px;margin-bottom:8px">
+        <div>
+          <div style="font-size:13px;font-weight:600">Recordatorio diario</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Te avisa a las 9pm para registrar gastos</div>
+        </div>
+        <button class="btn-sm" onclick="toggleDailyReminder()" style="${state.config.dailyReminder?'background:rgba(74,222,128,0.15);color:var(--green)':''}">
+          ${state.config.dailyReminder ? '🔔 Activo' : 'Activar'}
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--card2);border-radius:12px">
+        <div>
+          <div style="font-size:13px;font-weight:600">Alertas de vencimiento</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Gastos fijos y deudas próximas</div>
+        </div>
+        <button class="btn-sm" onclick="testNotification()">Probar</button>
+      </div>
+    </div>
+
     <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
       <button class="btn-danger" onclick="clearAllData()">🗑 Borrar todos los datos</button>
     </div>`;
@@ -1436,6 +1563,235 @@ function clearAllData() {
 }
 
 // ===== EXPORTAR / IMPORTAR =====
+// ============================================================
+// ===== ROJO 1: EXPORTAR PDF =================================
+// ============================================================
+async function exportPDF() {
+  // Cargar jsPDF desde CDN si no está cargado
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const m = state.currentMonth, y = state.currentYear;
+  const txs = getMonthTxs(m, y);
+  const income  = txs.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+  const expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
+  const balance = income - expense;
+  const cur = state.config.currency || 'S/';
+  const monthName = new Date(y, m, 1).toLocaleDateString('es-PE', {month:'long', year:'numeric'});
+  const fmtN = n => cur + ' ' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  // Colores
+  const purple = [108, 99, 255];
+  const dark   = [26, 26, 46];
+  const gray   = [100, 100, 120];
+  const green  = [74, 222, 128];
+  const red    = [248, 113, 113];
+  const white  = [255, 255, 255];
+
+  const W = 210, margin = 16;
+  let y_pos = 0;
+
+  // ── HEADER ──
+  doc.setFillColor(...dark);
+  doc.rect(0, 0, W, 42, 'F');
+  doc.setFillColor(...purple);
+  doc.circle(W - 28, 21, 28, 'F');
+
+  // Logo texto
+  doc.setTextColor(...white);
+  doc.setFontSize(22); doc.setFont('helvetica','bold');
+  doc.text('FinControl', margin, 18);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.setTextColor(180, 180, 210);
+  doc.text('Resumen financiero personal', margin, 25);
+  doc.setTextColor(...white);
+  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text(monthName.charAt(0).toUpperCase() + monthName.slice(1), margin, 34);
+
+  // Fecha generación
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.setTextColor(180, 180, 210);
+  doc.text('Generado: ' + new Date().toLocaleDateString('es-PE'), W - margin, 36, {align:'right'});
+
+  y_pos = 52;
+
+  // ── TARJETAS RESUMEN ──
+  const cardW = (W - margin*2 - 8) / 3;
+  const cards = [
+    { label: 'Ingresos', value: fmtN(income),  color: green },
+    { label: 'Gastos',   value: fmtN(expense), color: red   },
+    { label: 'Balance',  value: fmtN(balance),  color: balance >= 0 ? green : red },
+  ];
+  cards.forEach((c, i) => {
+    const x = margin + i * (cardW + 4);
+    doc.setFillColor(245, 245, 252);
+    doc.roundedRect(x, y_pos, cardW, 22, 3, 3, 'F');
+    doc.setFillColor(...c.color);
+    doc.roundedRect(x, y_pos, 3, 22, 1.5, 1.5, 'F');
+    doc.setTextColor(...gray);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(c.label, x + 7, y_pos + 8);
+    doc.setTextColor(...dark);
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(c.value, x + 7, y_pos + 17);
+  });
+
+  y_pos += 32;
+
+  // ── PATRIMONIO ──
+  const totalAssets = state.accounts.reduce((s,a) => s + getAccountBalance(a.id), 0);
+  const totalDebt   = state.debts.reduce((s,d) => s + Number(d.remaining||d.amount||0), 0);
+  const neto = totalAssets - totalDebt;
+  doc.setFillColor(240, 240, 255);
+  doc.roundedRect(margin, y_pos, W - margin*2, 16, 3, 3, 'F');
+  doc.setTextColor(...purple);
+  doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text('Patrimonio neto:', margin + 5, y_pos + 10);
+  doc.setTextColor(neto >= 0 ? 34 : 220, neto >= 0 ? 197 : 38, neto >= 0 ? 94 : 38);
+  doc.text(fmtN(neto), margin + 45, y_pos + 10);
+  doc.setTextColor(...gray);
+  doc.setFontSize(7);
+  doc.text(`Activos: ${fmtN(totalAssets)}   Deudas: ${fmtN(totalDebt)}`, W - margin, y_pos + 10, {align:'right'});
+
+  y_pos += 24;
+
+  // ── CUENTAS ──
+  if (state.accounts.length) {
+    doc.setTextColor(...purple);
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('Cuentas bancarias', margin, y_pos);
+    doc.setFillColor(...purple);
+    doc.rect(margin, y_pos + 2, W - margin*2, 0.5, 'F');
+    y_pos += 8;
+
+    state.accounts.forEach(a => {
+      if (y_pos > 260) { doc.addPage(); y_pos = 20; }
+      const bank = getBankById(a.bankId);
+      const bal  = getAccountBalance(a.id);
+      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.setTextColor(...dark);
+      doc.text(`${a.name} · ${bank.name}`, margin + 3, y_pos + 5);
+      doc.setTextColor(bal >= 0 ? 34 : 220, bal >= 0 ? 140 : 38, bal >= 0 ? 94 : 38);
+      doc.setFont('helvetica','bold');
+      doc.text(fmtN(bal), W - margin, y_pos + 5, {align:'right'});
+      doc.setFillColor(230, 230, 245);
+      doc.rect(margin, y_pos + 7, W - margin*2, 0.3, 'F');
+      y_pos += 10;
+    });
+    y_pos += 6;
+  }
+
+  // ── GASTOS POR CATEGORÍA ──
+  const spent = {};
+  txs.filter(t=>t.type==='expense').forEach(t => {
+    spent[t.category] = (spent[t.category]||0) + Number(t.amount);
+  });
+  const spentEntries = Object.entries(spent).sort((a,b)=>b[1]-a[1]);
+
+  if (spentEntries.length) {
+    if (y_pos > 220) { doc.addPage(); y_pos = 20; }
+    doc.setTextColor(...purple);
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('Gastos por categoría', margin, y_pos);
+    doc.setFillColor(...purple);
+    doc.rect(margin, y_pos + 2, W - margin*2, 0.5, 'F');
+    y_pos += 8;
+
+    spentEntries.forEach(([catId, amt]) => {
+      if (y_pos > 265) { doc.addPage(); y_pos = 20; }
+      const cat = getCatById('expense', catId);
+      const pct = expense > 0 ? (amt / expense) * 100 : 0;
+      const barW = W - margin*2 - 70;
+
+      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.setTextColor(...dark);
+      doc.text(`${cat.emoji} ${cat.name}`, margin + 3, y_pos + 5);
+      doc.setTextColor(...gray);
+      doc.text(`${pct.toFixed(1)}%`, margin + barW + 5, y_pos + 5);
+      doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+      doc.text(fmtN(amt), W - margin, y_pos + 5, {align:'right'});
+
+      // Mini barra
+      doc.setFillColor(220, 220, 235);
+      doc.roundedRect(margin + 3, y_pos + 6, barW, 2.5, 1, 1, 'F');
+      doc.setFillColor(...purple);
+      doc.roundedRect(margin + 3, y_pos + 6, Math.max(1, barW * pct / 100), 2.5, 1, 1, 'F');
+
+      doc.setFillColor(230, 230, 245);
+      doc.rect(margin, y_pos + 10, W - margin*2, 0.3, 'F');
+      y_pos += 12;
+    });
+    y_pos += 4;
+  }
+
+  // ── TRANSACCIONES DEL MES ──
+  if (txs.length) {
+    if (y_pos > 210) { doc.addPage(); y_pos = 20; }
+    doc.setTextColor(...purple);
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('Movimientos del mes', margin, y_pos);
+    doc.setFillColor(...purple);
+    doc.rect(margin, y_pos + 2, W - margin*2, 0.5, 'F');
+    y_pos += 8;
+
+    // Cabecera tabla
+    doc.setFillColor(240, 240, 252);
+    doc.rect(margin, y_pos, W - margin*2, 7, 'F');
+    doc.setTextColor(...gray);
+    doc.setFontSize(7); doc.setFont('helvetica','bold');
+    doc.text('Fecha',       margin + 2,  y_pos + 5);
+    doc.text('Descripción', margin + 22, y_pos + 5);
+    doc.text('Categoría',   margin + 90, y_pos + 5);
+    doc.text('Tipo',        margin + 130, y_pos + 5);
+    doc.text('Monto',       W - margin,  y_pos + 5, {align:'right'});
+    y_pos += 9;
+
+    const sorted = [...txs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    sorted.forEach((t, idx) => {
+      if (y_pos > 272) { doc.addPage(); y_pos = 20; }
+      if (idx % 2 === 0) {
+        doc.setFillColor(248, 248, 255);
+        doc.rect(margin, y_pos - 1, W - margin*2, 7, 'F');
+      }
+      const cat = getCatById(t.type, t.category);
+      const dateStr = new Date(t.date).toLocaleDateString('es-PE', {day:'2-digit', month:'2-digit'});
+      doc.setTextColor(...dark); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+      doc.text(dateStr, margin + 2, y_pos + 4);
+      const desc = t.description.length > 28 ? t.description.slice(0,26)+'..' : t.description;
+      doc.text(desc, margin + 22, y_pos + 4);
+      doc.text(`${cat.emoji} ${cat.name}`.slice(0,18), margin + 90, y_pos + 4);
+      doc.setTextColor(t.type==='income' ? 34 : 180, t.type==='income' ? 140 : 40, t.type==='income' ? 94 : 40);
+      doc.text(t.type==='income'?'Ingreso':'Gasto', margin + 130, y_pos + 4);
+      doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+      doc.text(fmtN(t.amount), W - margin, y_pos + 4, {align:'right'});
+      y_pos += 7;
+    });
+  }
+
+  // ── FOOTER ──
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFillColor(245, 245, 252);
+    doc.rect(0, 287, W, 10, 'F');
+    doc.setTextColor(...gray);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('FinControl · Reporte personal de finanzas', margin, 293);
+    doc.text(`Pág. ${i} / ${pageCount}`, W - margin, 293, {align:'right'});
+  }
+
+  doc.save(`FinControl_${monthName.replace(' ','_')}.pdf`);
+}
+
 function exportCSV() {
   if(!state.transactions.length){alert('Sin movimientos para exportar');return;}
   const rows=[['Fecha','Tipo','Descripción','Monto','Categoría','Cuenta','Reembolsable','Nota']];
@@ -1859,6 +2215,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('month-label').textContent = getMonthLabel();
   fetchExchangeRate();
   setInterval(fetchExchangeRate, 30 * 60 * 1000);
+  // Registrar service worker para notificaciones y cache offline
+  initNotifications();
   setTimeout(() => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
