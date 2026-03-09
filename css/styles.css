@@ -237,3 +237,76 @@ input, select, textarea { font-family: var(--font); outline: none; border: none;
 .topbar-logo-img {
   width: 30px; height: 30px; flex-shrink: 0;
 }
+
+/* ===== PIN DE ACCESO ===== */
+#pin-screen {
+  position: fixed; inset: 0; z-index: 998;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 0; padding: 40px 32px;
+}
+#pin-screen.hide { display: none; }
+.pin-logo { width: 64px; height: 64px; margin-bottom: 16px; }
+.pin-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.pin-subtitle { font-size: 13px; color: var(--text2); margin-bottom: 32px; }
+.pin-dots {
+  display: flex; gap: 16px; margin-bottom: 32px;
+}
+.pin-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--text3);
+  background: transparent;
+  transition: all 0.2s;
+}
+.pin-dot.filled { background: var(--accent); border-color: var(--accent); transform: scale(1.1); }
+.pin-dot.error { background: var(--red); border-color: var(--red); animation: pinShake 0.4s ease; }
+@keyframes pinShake {
+  0%,100% { transform: translateX(0); }
+  20%,60%  { transform: translateX(-6px); }
+  40%,80%  { transform: translateX(6px); }
+}
+.pin-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px; width: 100%; max-width: 280px;
+}
+.pin-key {
+  height: 64px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 22px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+.pin-key:active { background: var(--accent); color: white; transform: scale(0.95); }
+.pin-key.del { font-size: 18px; color: var(--text2); }
+.pin-key.empty { background: transparent; border: none; pointer-events: none; }
+.pin-forgot { margin-top: 24px; font-size: 12px; color: var(--text3); }
+.pin-forgot button { color: var(--accent); font-size: 12px; background: none; }
+
+/* ===== PRESUPUESTO ===== */
+.budget-bar-wrap { margin: 4px 0 8px; }
+.budget-bar-track { height: 8px; background: var(--card2); border-radius: 4px; overflow: hidden; }
+.budget-bar-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.5s ease; }
+.budget-bar-fill.warn { background: var(--yellow); }
+.budget-bar-fill.danger { background: var(--red); }
+.budget-item {
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.budget-item:last-child { border-bottom: none; }
+.budget-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.budget-cat { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.budget-amounts { font-size: 11px; color: var(--text2); display: flex; justify-content: space-between; margin-top: 4px; }
+
+/* ===== RECURRENTES ===== */
+.recurring-alert {
+  background: linear-gradient(135deg, rgba(108,99,255,0.12), rgba(74,222,128,0.08));
+  border: 1px solid rgba(108,99,255,0.25);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.recurring-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.recurring-item:last-child { border-bottom: none; }
