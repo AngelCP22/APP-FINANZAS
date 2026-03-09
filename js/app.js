@@ -200,6 +200,8 @@ function renderHome() {
   document.getElementById('recent-transactions').innerHTML=recent.length
     ?`<div class="card card-sm">${recent.map(txItem).join('')}</div>`
     :`<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">Sin movimientos este mes</div></div>`;
+  // Amarillo 3: presupuesto por categoría
+  renderBudgets();
 }
 
 function renderAlerts() {
@@ -209,6 +211,10 @@ function renderAlerts() {
   state.debts.filter(d=>d.dueDate).forEach(d=>{if(new Date(d.dueDate)<today&&d.status!=='paid')alerts.push({type:'danger',msg:`🔴 Deuda vencida: ${d.name}`});});
   state.transactions.filter(t=>t.reimbursable&&!t.reimbursed).forEach(t=>{if(Math.floor((today-new Date(t.date))/86400000)>30)alerts.push({type:'warning',msg:`💰 Reembolso +30 días: ${t.description} (${fmt(t.amount)})`});});
   document.getElementById('alerts-container').innerHTML=alerts.map(a=>`<div class="alert-banner ${a.type}">${a.msg}</div>`).join('');
+  // Amarillo 2: gastos recurrentes pendientes
+  checkRecurringExpenses();
+  // Amarillo 3: alertas de presupuesto
+  renderBudgetAlerts();
 }
 
 function renderAccounts() {
@@ -1339,6 +1345,7 @@ function switchStatTab(tab, btn) {
 // ===== CONFIGURACIÓN =====
 function renderModalConfig() {
   const accents = ['#6C63FF','#FF6584','#4ade80','#fbbf24','#60a5fa','#f97316','#a78bfa','#ec4899'];
+  const pinEnabled = !!localStorage.getItem('fc_pin');
   document.getElementById('modal-config-body').innerHTML = `
     <div class="form-group">
       <label class="form-label">Moneda</label>
@@ -1363,7 +1370,35 @@ function renderModalConfig() {
         ${accents.map(c=>`<div class="color-dot ${state.config.accent===c?'selected':''}" style="background:${c}" onclick="setAccent('${c}',this)"></div>`).join('')}
       </div>
     </div>
+
+    <!-- PIN DE ACCESO -->
     <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">🔒 Seguridad</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--card2);border-radius:12px">
+        <div>
+          <div style="font-size:13px;font-weight:600">PIN de acceso</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${pinEnabled ? '✅ Activado' : 'Sin PIN configurado'}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm" onclick="openSetPin()">${pinEnabled ? 'Cambiar' : 'Activar'}</button>
+          ${pinEnabled ? `<button class="btn-sm" style="background:rgba(248,113,113,0.15);color:var(--red)" onclick="disablePin()">Quitar</button>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- PRESUPUESTO POR CATEGORÍA -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">💰 Presupuesto mensual</div>
+      ${renderBudgetConfig()}
+    </div>
+
+    <!-- CATEGORÍAS PERSONALIZABLES -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">🏷️ Categorías</div>
+      ${renderCategoryConfig()}
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
       <button class="btn-danger" onclick="clearAllData()">🗑 Borrar todos los datos</button>
     </div>`;
 }
@@ -1444,15 +1479,386 @@ function importBackup(e) {
   reader.readAsText(file);
   e.target.value='';
 }
+// ============================================================
+// ===== AMARILLO 1: PIN DE ACCESO ============================
+// ============================================================
+let pinBuffer = '';
+let pinMode = 'check'; // 'check' | 'set' | 'confirm'
+let pinTemp = '';
+
+function initPin() {
+  const saved = localStorage.getItem('fc_pin');
+  if (!saved) return; // Sin PIN configurado, no mostrar
+  const pinScreen = document.getElementById('pin-screen');
+  if (pinScreen) pinScreen.classList.remove('hide');
+}
+
+function pinPress(digit) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if (pinBuffer.length === 4) setTimeout(checkPin, 150);
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+
+function updatePinDots(state = 'normal') {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('pd' + i);
+    if (!dot) continue;
+    dot.className = 'pin-dot';
+    if (i < pinBuffer.length) dot.classList.add(state === 'error' ? 'error' : 'filled');
+  }
+}
+
+function checkPin() {
+  const saved = localStorage.getItem('fc_pin');
+  if (pinMode === 'check') {
+    if (pinBuffer === saved) {
+      document.getElementById('pin-screen')?.classList.add('hide');
+      pinBuffer = '';
+    } else {
+      updatePinDots('error');
+      setTimeout(() => { pinBuffer = ''; updatePinDots(); }, 600);
+    }
+  } else if (pinMode === 'set') {
+    pinTemp = pinBuffer;
+    pinBuffer = '';
+    pinMode = 'confirm';
+    const sub = document.getElementById('pin-subtitle');
+    if (sub) sub.textContent = 'Confirma tu PIN';
+    updatePinDots();
+  } else if (pinMode === 'confirm') {
+    if (pinBuffer === pinTemp) {
+      localStorage.setItem('fc_pin', pinBuffer);
+      state.config.pinEnabled = true;
+      saveState();
+      pinBuffer = ''; pinMode = 'check'; pinTemp = '';
+      document.getElementById('pin-screen')?.classList.add('hide');
+      alert('✅ PIN configurado correctamente');
+      renderModalConfig();
+    } else {
+      updatePinDots('error');
+      setTimeout(() => {
+        pinBuffer = ''; pinMode = 'set'; pinTemp = '';
+        const sub = document.getElementById('pin-subtitle');
+        if (sub) sub.textContent = 'Ingresa tu nuevo PIN';
+        updatePinDots();
+      }, 600);
+    }
+  }
+}
+
+function pinForgot() {
+  if (confirm('¿Borrar el PIN? Necesitarás configurar uno nuevo.\n\nNota: tus datos financieros se mantienen.')) {
+    localStorage.removeItem('fc_pin');
+    state.config.pinEnabled = false;
+    saveState();
+    document.getElementById('pin-screen')?.classList.add('hide');
+    renderModalConfig();
+  }
+}
+
+function openSetPin() {
+  pinBuffer = ''; pinMode = 'set'; pinTemp = '';
+  const sub = document.getElementById('pin-subtitle');
+  if (sub) sub.textContent = 'Ingresa tu nuevo PIN';
+  updatePinDots();
+  document.getElementById('pin-screen')?.classList.remove('hide');
+}
+
+function disablePin() {
+  if (!confirm('¿Desactivar el PIN de acceso?')) return;
+  localStorage.removeItem('fc_pin');
+  state.config.pinEnabled = false;
+  saveState();
+  renderModalConfig();
+}
+
+// ============================================================
+// ===== AMARILLO 2: GASTOS RECURRENTES AUTOMÁTICOS ===========
+// ============================================================
+function checkRecurringExpenses() {
+  if (!state.fixedExpenses.length) return;
+  const today = new Date();
+  const m = today.getMonth(), y = today.getFullYear();
+  const pending = [];
+
+  state.fixedExpenses.forEach(f => {
+    const dueDay = Number(f.day);
+    const dueDate = new Date(y, m, dueDay);
+    // ¿Ya se registró este mes?
+    const alreadyPaid = state.transactions.some(t =>
+      t.note === 'fc_recurrente_' + f.id &&
+      new Date(t.date).getMonth() === m &&
+      new Date(t.date).getFullYear() === y
+    );
+    // Vence hoy o ya pasó este mes y no está pagado
+    if (!alreadyPaid && dueDate <= today) {
+      pending.push(f);
+    }
+  });
+
+  if (!pending.length) return;
+
+  // Mostrar alerta en home
+  const cont = document.getElementById('alerts-container');
+  if (!cont) return;
+
+  const alertHtml = `
+    <div class="recurring-alert">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">
+        🔄 ${pending.length} gasto${pending.length>1?'s':''} fijo${pending.length>1?'s':''} pendiente${pending.length>1?'s':''}
+      </div>
+      ${pending.map(f => `
+        <div class="recurring-item">
+          <span style="font-size:20px">${f.emoji||'📋'}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${f.name}</div>
+            <div style="font-size:11px;color:var(--text2)">Día ${f.day} · ${fmt(f.amount)}</div>
+          </div>
+          <button class="btn-sm" style="font-size:11px;padding:6px 10px"
+                  onclick="autoPayRecurring('${f.id}')">Registrar</button>
+        </div>`).join('')}
+      <button onclick="autoPayAllRecurring(${JSON.stringify(pending.map(f=>f.id))})"
+              class="btn-primary" style="margin-top:10px;padding:10px;font-size:13px">
+        ✅ Registrar todos (${fmt(pending.reduce((s,f)=>s+Number(f.amount),0))})
+      </button>
+    </div>`;
+
+  cont.insertAdjacentHTML('afterbegin', alertHtml);
+}
+
+function autoPayRecurring(fixedId) {
+  const f = state.fixedExpenses.find(x => x.id === fixedId);
+  if (!f) return;
+  state.transactions.push({
+    id: uid(), type: 'expense', description: f.name,
+    amount: f.amount, date: new Date().toISOString().split('T')[0],
+    category: 'services', accountId: f.accountId,
+    reimbursable: false, reimbursed: false,
+    note: 'fc_recurrente_' + f.id, createdAt: Date.now()
+  });
+  saveState(); renderHome();
+}
+
+function autoPayAllRecurring(ids) {
+  ids.forEach(id => autoPayRecurring(id));
+}
+
+// ============================================================
+// ===== AMARILLO 3: PRESUPUESTO POR CATEGORÍA ================
+// ============================================================
+function renderBudgets() {
+  const budgets = state.config.budgets || {};
+  const m = state.currentMonth, y = state.currentYear;
+  const txs = getMonthTxs(m, y).filter(t => t.type === 'expense');
+
+  // Calcular gasto real por categoría
+  const spent = {};
+  txs.forEach(t => { spent[t.category] = (spent[t.category] || 0) + Number(t.amount); });
+
+  const cats = state.categories.expense;
+  const hasBudgets = Object.keys(budgets).length > 0;
+
+  const el = document.getElementById('budgets-container');
+  if (!el) return;
+
+  if (!hasBudgets) {
+    el.innerHTML = `
+      <div class="empty" style="padding:24px">
+        <div class="empty-icon">💰</div>
+        <div class="empty-text">Sin presupuestos definidos</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px">Configúralos en ⚙️ Configuración</div>
+      </div>`;
+    return;
+  }
+
+  const items = cats.filter(c => budgets[c.id] > 0).map(c => {
+    const limit = Number(budgets[c.id] || 0);
+    const used  = Number(spent[c.id] || 0);
+    const pct   = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+    const barClass = pct >= 100 ? 'danger' : pct >= 80 ? 'warn' : '';
+    const remaining = limit - used;
+    return `
+      <div class="budget-item">
+        <div class="budget-header">
+          <div class="budget-cat"><span>${c.emoji}</span><span>${c.name}</span></div>
+          <span style="font-size:12px;font-weight:700;color:${pct>=100?'var(--red)':pct>=80?'var(--yellow)':'var(--text)'}">${pct.toFixed(0)}%</span>
+        </div>
+        <div class="budget-bar-wrap">
+          <div class="budget-bar-track">
+            <div class="budget-bar-fill ${barClass}" style="width:${pct}%"></div>
+          </div>
+        </div>
+        <div class="budget-amounts">
+          <span>Gastado: <b>${fmt(used)}</b></span>
+          <span style="color:${remaining<0?'var(--red)':'var(--text2)'}">
+            ${remaining >= 0 ? `Disponible: ${fmt(remaining)}` : `Excedido: ${fmt(Math.abs(remaining))}`}
+          </span>
+          <span>Límite: ${fmt(limit)}</span>
+        </div>
+      </div>`;
+  });
+
+  el.innerHTML = items.length
+    ? `<div class="card card-sm">${items.join('')}</div>`
+    : `<div class="empty" style="padding:20px"><div class="empty-icon">💰</div><div class="empty-text">Sin presupuestos con límite</div></div>`;
+}
+
+function renderBudgetAlerts() {
+  const budgets = state.config.budgets || {};
+  const m = state.currentMonth, y = state.currentYear;
+  const txs = getMonthTxs(m, y).filter(t => t.type === 'expense');
+  const spent = {};
+  txs.forEach(t => { spent[t.category] = (spent[t.category] || 0) + Number(t.amount); });
+
+  state.categories.expense.forEach(c => {
+    const limit = Number(budgets[c.id] || 0);
+    if (!limit) return;
+    const used = Number(spent[c.id] || 0);
+    const pct = (used / limit) * 100;
+    if (pct >= 100) {
+      const cont = document.getElementById('alerts-container');
+      if (cont) cont.insertAdjacentHTML('beforeend',
+        `<div class="alert-banner danger">🚨 Presupuesto de ${c.emoji} ${c.name} excedido (${fmt(used)} / ${fmt(limit)})</div>`);
+    } else if (pct >= 80) {
+      const cont = document.getElementById('alerts-container');
+      if (cont) cont.insertAdjacentHTML('beforeend',
+        `<div class="alert-banner warning">⚠️ ${c.emoji} ${c.name} al ${pct.toFixed(0)}% del presupuesto</div>`);
+    }
+  });
+}
+
+function renderBudgetConfig() {
+  const budgets = state.config.budgets || {};
+  const cats = state.categories.expense;
+  return `
+    <div class="form-group">
+      <label class="form-label">Presupuesto mensual por categoría</label>
+      ${cats.map(c => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:20px;width:28px">${c.emoji}</span>
+          <span style="flex:1;font-size:13px;font-weight:600">${c.name}</span>
+          <input class="form-input" style="width:110px;padding:8px 10px;font-size:13px;text-align:right"
+                 type="number" placeholder="0.00" inputmode="decimal"
+                 id="budget-${c.id}" value="${budgets[c.id]||''}"/>
+        </div>`).join('')}
+    </div>
+    <button class="btn-primary" onclick="saveBudgets()">Guardar presupuestos</button>`;
+}
+
+function saveBudgets() {
+  const budgets = {};
+  state.categories.expense.forEach(c => {
+    const val = parseFloat(document.getElementById('budget-' + c.id)?.value || 0);
+    if (val > 0) budgets[c.id] = val;
+  });
+  state.config.budgets = budgets;
+  saveState();
+  alert('✅ Presupuestos guardados');
+  closeModal('modal-config');
+  renderCurrentScreen();
+}
+
+// ============================================================
+// ===== AMARILLO 4: CATEGORÍAS PERSONALIZABLES ===============
+// ============================================================
+function renderCategoryConfig() {
+  const expCats = state.categories.expense;
+  const incCats = state.categories.income;
+
+  return `
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Categorías de gasto</div>
+      <div id="exp-cats-list">
+        ${expCats.map(c => catConfigItem(c, 'expense')).join('')}
+      </div>
+      <button onclick="openAddCatModal('expense')" class="btn-secondary" style="margin-top:8px;padding:8px;font-size:12px">+ Nueva categoría de gasto</button>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Categorías de ingreso</div>
+      <div id="inc-cats-list">
+        ${incCats.map(c => catConfigItem(c, 'income')).join('')}
+      </div>
+      <button onclick="openAddCatModal('income')" class="btn-secondary" style="margin-top:8px;padding:8px;font-size:12px">+ Nueva categoría de ingreso</button>
+    </div>`;
+}
+
+function catConfigItem(c, type) {
+  const isDefault = ['food','transport','health','entertainment','education','clothing','services','rent','tech','salary','freelance','bonus','investment','sale'].includes(c.id);
+  return `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:20px">${c.emoji}</span>
+      <span style="flex:1;font-size:13px;font-weight:600">${c.name}</span>
+      ${isDefault
+        ? `<span style="font-size:10px;color:var(--text3);padding:2px 6px;background:var(--card2);border-radius:4px">Base</span>`
+        : `<button onclick="deleteCat('${type}','${c.id}')" style="background:rgba(248,113,113,0.1);border-radius:6px;padding:4px 8px;color:var(--red);font-size:12px">✕</button>`}
+    </div>`;
+}
+
+function openAddCatModal(type) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nueva categoría de ${type==='expense'?'gasto':'ingreso'}</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input class="form-input" id="newcat-emoji" placeholder="📦" maxlength="2" style="font-size:22px;text-align:center"/>
+      </div>
+      <div class="form-group" style="flex:3">
+        <label class="form-label">Nombre</label>
+        <input class="form-input" id="newcat-name" placeholder="Ej: Mascotas, Gym..."/>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveNewCat('${type}', this.closest('.modal-overlay'))">Agregar categoría</button>
+    <button class="btn-danger" style="margin-top:8px" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+  </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function saveNewCat(type, overlay) {
+  const emoji = document.getElementById('newcat-emoji')?.value.trim() || '📦';
+  const name  = document.getElementById('newcat-name')?.value.trim();
+  if (!name) { alert('Ingresa un nombre'); return; }
+  const id = 'custom_' + Date.now();
+  state.categories[type].push({ id, name, emoji });
+  saveState();
+  overlay.remove();
+  // Refrescar la sección de config
+  const expList = document.getElementById('exp-cats-list');
+  const incList = document.getElementById('inc-cats-list');
+  if (expList) expList.innerHTML = state.categories.expense.map(c=>catConfigItem(c,'expense')).join('');
+  if (incList) incList.innerHTML = state.categories.income.map(c=>catConfigItem(c,'income')).join('');
+}
+
+function deleteCat(type, id) {
+  // Verificar si hay transacciones con esta categoría
+  const inUse = state.transactions.some(t => t.type === type && t.category === id);
+  if (inUse) {
+    if (!confirm('Esta categoría tiene transacciones. Se marcarán como "Otros". ¿Continuar?')) return;
+    state.transactions.forEach(t => { if(t.type===type && t.category===id) t.category = 'other'; });
+  }
+  state.categories[type] = state.categories[type].filter(c => c.id !== id);
+  saveState();
+  const expList = document.getElementById('exp-cats-list');
+  const incList = document.getElementById('inc-cats-list');
+  if (expList) expList.innerHTML = state.categories.expense.map(c=>catConfigItem(c,'expense')).join('');
+  if (incList) incList.innerHTML = state.categories.income.map(c=>catConfigItem(c,'income')).join('');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadState();
   applyTheme();
   document.getElementById('month-label').textContent = getMonthLabel();
-  // Fetch tipo de cambio al iniciar
   fetchExchangeRate();
-  // Actualizar cada 30 minutos
   setInterval(fetchExchangeRate, 30 * 60 * 1000);
-  // Splash screen
   setTimeout(() => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
@@ -1460,5 +1866,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => splash.remove(), 500);
     }
     showScreen('home');
+    // PIN: mostrar después del splash si está configurado
+    setTimeout(() => initPin(), 100);
   }, 1800);
 });
