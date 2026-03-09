@@ -21,7 +21,35 @@
 </head>
 <body>
 
-<!-- ===== SPLASH SCREEN ===== -->
+<!-- ===== PIN SCREEN ===== -->
+<div id="pin-screen" class="hide">
+  <img class="pin-logo" src="logo.svg" alt="Logo">
+  <div class="pin-title">FinControl</div>
+  <div class="pin-subtitle" id="pin-subtitle">Ingresa tu PIN</div>
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-grid">
+    <button class="pin-key" onclick="pinPress('1')">1</button>
+    <button class="pin-key" onclick="pinPress('2')">2</button>
+    <button class="pin-key" onclick="pinPress('3')">3</button>
+    <button class="pin-key" onclick="pinPress('4')">4</button>
+    <button class="pin-key" onclick="pinPress('5')">5</button>
+    <button class="pin-key" onclick="pinPress('6')">6</button>
+    <button class="pin-key" onclick="pinPress('7')">7</button>
+    <button class="pin-key" onclick="pinPress('8')">8</button>
+    <button class="pin-key" onclick="pinPress('9')">9</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="pinPress('0')">0</button>
+    <button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <div class="pin-forgot"><button onclick="pinForgot()">¿Olvidaste tu PIN?</button></div>
+</div>
+
+
 <div id="splash-screen">
   <img class="splash-logo" src="logo.svg" alt="FinControl Logo">
   <div class="splash-name">FinControl</div>
@@ -66,6 +94,11 @@
         <button class="section-action" onclick="showScreen('accounts')">Ver todas</button>
       </div>
       <div id="home-accounts-summary"></div>
+      <div class="section-header">
+        <span class="section-title">Presupuesto del mes</span>
+        <button class="section-action" onclick="openModal('modal-config')">Configurar</button>
+      </div>
+      <div id="budgets-container"></div>
       <div class="section-header">
         <span class="section-title">Movimientos recientes</span>
         <button class="section-action" onclick="showScreen('more')">Ver todo</button>
