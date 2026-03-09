@@ -20,6 +20,51 @@ let state = {
   currentScreen: 'home', currentStatTab: 'current'
 };
 
+// ===== TIPO DE CAMBIO =====
+let exchangeRate = { pen: null, lastUpdate: null };
+
+async function fetchExchangeRate() {
+  try {
+    // API gratuita sin key requerida
+    const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    exchangeRate.pen = data.rates?.PEN || null;
+    exchangeRate.lastUpdate = new Date();
+    renderExchangeWidget();
+  } catch(e) {
+    // Fallback: intentar segunda API
+    try {
+      const res2 = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data2 = await res2.json();
+      exchangeRate.pen = data2.rates?.PEN || null;
+      exchangeRate.lastUpdate = new Date();
+      renderExchangeWidget();
+    } catch(e2) {
+      exchangeRate.pen = null;
+      renderExchangeWidget();
+    }
+  }
+}
+
+function renderExchangeWidget() {
+  const el = document.getElementById('exchange-rate-widget');
+  if (!el) return;
+  if (!exchangeRate.pen) {
+    el.innerHTML = '';
+    return;
+  }
+  const time = exchangeRate.lastUpdate?.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) || '';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(108,99,255,0.08);border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">💱</span>
+      <span style="font-size:12px;color:var(--text2)">USD/PEN</span>
+      <span style="font-size:14px;font-weight:800;color:var(--accent)">S/ ${exchangeRate.pen.toFixed(3)}</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:auto">Act. ${time}</span>
+      <button onclick="fetchExchangeRate()" style="background:none;color:var(--text3);font-size:11px;padding:2px 4px" title="Actualizar">↻</button>
+    </div>`;
+}
+
 const BANKS = [
   {id:'bcp',name:'BCP',color:'#003DA5'},{id:'bbva',name:'BBVA',color:'#004481'},
   {id:'ibk',name:'Interbank',color:'#006F2E'},{id:'scotia',name:'Scotiabank',color:'#EC111A'},
@@ -552,6 +597,33 @@ function debtCard(d) {
     const total = Number(d.amount||0);
     const rem   = Number(d.remaining||total);
     pct = total>0 ? Math.min(100,((total-rem)/total)*100) : 0;
+
+    // Proyección: calcular fecha estimada de fin
+    let proyeccionHtml = '';
+    if (d.monthlyPayment > 0 && rem > 0) {
+      const mesesRestantes = Math.ceil(rem / d.monthlyPayment);
+      const fechaFin = new Date();
+      fechaFin.setMonth(fechaFin.getMonth() + mesesRestantes);
+      const mesAnio = fechaFin.toLocaleDateString('es-PE', {month:'long', year:'numeric'});
+      const totalPagar = mesesRestantes * d.monthlyPayment;
+      const interes = totalPagar - rem;
+      proyeccionHtml = `
+        <div style="background:rgba(108,99,255,0.07);border-radius:8px;padding:8px 10px;margin-top:6px">
+          <div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">📅 Proyección de pago</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--text2)">Terminas en</span>
+            <span style="font-weight:700;color:var(--accent)">${mesesRestantes} mes${mesesRestantes!==1?'es':''} · ${mesAnio}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:2px">
+            <span style="color:var(--text2)">Total a pagar</span>
+            <span style="font-weight:700">${fmt(totalPagar)}</span>
+          </div>
+          ${interes > 0 ? `<div style="display:flex;justify-content:space-between;font-size:11px;margin-top:2px"><span style="color:var(--text2)">Intereses aprox.</span><span style="color:var(--red)">${fmt(interes)}</span></div>` : ''}
+        </div>`;
+    } else if (rem > 0 && !d.monthlyPayment) {
+      proyeccionHtml = `<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Agrega una cuota mensual para ver la proyección</div>`;
+    }
+
     barHtml = `
       <div class="progress-wrap">
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px">
@@ -559,7 +631,8 @@ function debtCard(d) {
         </div>
         <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:var(--green)"></div></div>
         ${d.monthlyPayment?`<div style="font-size:11px;color:var(--text2);margin-top:3px">Cuota mensual: ${fmt(d.monthlyPayment)}</div>`:''}
-      </div>`;
+      </div>
+      ${proyeccionHtml}`;
   }
 
   return `<div class="debt-card">
@@ -1098,12 +1171,21 @@ function renderMore() {
 // ===== HISTORIAL =====
 function renderHistory() {
   const filter = document.getElementById('hist-filter-type')?.value || 'all';
+  const search = document.getElementById('hist-search')?.value?.toLowerCase().trim() || '';
   let txs = [...state.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  if(filter!=='all') txs = txs.filter(t=>t.type===filter);
+  if (filter !== 'all') txs = txs.filter(t => t.type === filter);
+  if (search) txs = txs.filter(t =>
+    t.description?.toLowerCase().includes(search) ||
+    t.note?.toLowerCase().includes(search) ||
+    getCatById(t.type, t.category)?.name?.toLowerCase().includes(search) ||
+    state.accounts.find(a=>a.id===t.accountId)?.name?.toLowerCase().includes(search)
+  );
   const list = document.getElementById('history-list');
+  const countEl = document.getElementById('hist-count');
+  if (countEl) countEl.textContent = txs.length > 0 ? `${txs.length} movimiento${txs.length!==1?'s':''}` : '';
   list.innerHTML = txs.length
     ? `<div class="card card-sm">${txs.map(txItem).join('')}</div>`
-    : `<div class="empty"><div class="empty-icon">📂</div><div class="empty-text">Sin movimientos</div></div>`;
+    : `<div class="empty"><div class="empty-icon">${search?'🔍':'📂'}</div><div class="empty-text">${search?`Sin resultados para "${search}"`:'Sin movimientos'}</div></div>`;
 }
 
 // ===== RENDER STATS =====
@@ -1366,7 +1448,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadState();
   applyTheme();
   document.getElementById('month-label').textContent = getMonthLabel();
-  // Splash screen: esperar animación de carga (1.8s) luego ocultar
+  // Fetch tipo de cambio al iniciar
+  fetchExchangeRate();
+  // Actualizar cada 30 minutos
+  setInterval(fetchExchangeRate, 30 * 60 * 1000);
+  // Splash screen
   setTimeout(() => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
