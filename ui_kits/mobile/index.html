@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FinControl — Mobile UI Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+/* ─── Reset ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:#111;}
+body{font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+
+/* ─── Viewport container ─── */
+#root{display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0a12;}
+
+/* ─── Phone frame ─── */
+.phone-frame{
+  width:390px;height:844px;
+  background:var(--bg,#0f0f1a);
+  border-radius:44px;
+  overflow:hidden;
+  position:relative;
+  box-shadow:0 30px 80px rgba(0,0,0,0.7),0 0 0 8px #1a1a2e,0 0 0 10px #0a0a12;
+  display:flex;flex-direction:column;
+  transition:background 0.3s;
+}
+
+/* ─── Dark / Light tokens ─── */
+.dark{
+  --bg:#141414;--bg2:#1c1c1c;--bg3:#111111;
+  --card:#242424;--card2:#2e2e2e;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f5f5;--text2:#888888;--text3:#555555;
+  --accent:#f59e0b;--accent2:#fbbf24;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;
+}
+.light{
+  --bg:#fafafa;--bg2:#f5f5f5;--bg3:#efefef;
+  --card:#ffffff;--card2:#f5f5f5;
+  --border:rgba(0,0,0,0.08);
+  --text:#111111;--text2:#888888;--text3:#bbbbbb;
+  --accent:#d97706;--accent2:#f59e0b;
+  --green:#16a34a;--red:#dc2626;--yellow:#ca8a04;
+}
+
+/* ─── Topbar ─── */
+.topbar{
+  padding:48px 18px 12px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  flex-shrink:0;
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+}
+.tb-logo{display:flex;align-items:center;gap:9px;}
+.tb-logo-img{width:30px;height:30px;flex-shrink:0;}
+.tb-title{font-size:18px;font-weight:700;color:var(--text);}
+.tb-sub{font-size:11px;color:var(--text2);margin-top:1px;}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--card);color:var(--text);
+  font-size:16px;display:flex;align-items:center;justify-content:center;
+  border:none;cursor:pointer;transition:background 0.15s;flex-shrink:0;
+}
+.icon-btn:active{background:var(--accent);}
+
+/* ─── Month nav ─── */
+.month-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;background:var(--bg2);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.mn-btn{
+  width:30px;height:30px;border-radius:7px;
+  background:var(--card);color:var(--text);
+  font-size:16px;display:flex;align-items:center;justify-content:center;
+  border:none;cursor:pointer;
+}
+.mn-label{font-size:13px;font-weight:600;color:var(--text);}
+
+/* ─── Screens ─── */
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:80px;-webkit-overflow-scrolling:touch;}
+.screen-inner{padding:0 16px;}
+::-webkit-scrollbar{width:0;height:0;}
+
+/* ─── Bottom nav ─── */
+.bottom-nav{
+  display:flex;background:var(--bg2);
+  border-top:1px solid var(--border);
+  padding:8px 0 20px;flex-shrink:0;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:4px 2px;gap:3px;
+  background:none;border:none;color:var(--text3);
+  font-size:10px;font-weight:500;cursor:pointer;
+  position:relative;font-family:inherit;
+}
+.nav-icon{font-size:20px;transition:transform 0.2s;}
+.nav-item.active{color:var(--accent);}
+.nav-item.active .nav-icon{transform:translateY(-2px);}
+.nav-item.active::after{
+  content:'';position:absolute;bottom:0;left:50%;
+  transform:translateX(-50%);width:20px;height:2px;
+  background:var(--accent);border-radius:2px;
+}
+
+/* ─── FAB ─── */
+.fab{
+  position:absolute;bottom:calc(80px + 16px);right:16px;
+  width:52px;height:52px;border-radius:16px;
+  background:var(--accent);color:white;
+  font-size:26px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(245,158,11,0.4);
+  border:none;cursor:pointer;z-index:50;
+  transition:transform 0.2s;font-family:inherit;
+}
+.fab:active{transform:scale(0.95);}
+
+/* ─── Cards ─── */
+.card{
+  background:var(--card);border-radius:16px;
+  border:1px solid var(--border);padding:16px;
+  margin-bottom:12px;
+}
+.card-sm{padding:12px;}
+.card-title{
+  font-size:11px;font-weight:600;color:var(--text2);
+  text-transform:uppercase;letter-spacing:0.8px;
+  margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;
+}
+
+/* ─── Hero balance ─── */
+.hero-balance{
+  background:linear-gradient(135deg,var(--bg3) 0%,var(--card) 100%);
+  border-radius:16px;border:1px solid var(--border);
+  padding:20px;margin-bottom:12px;
+  position:relative;overflow:hidden;
+}
+.hero-balance::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:150px;height:150px;
+  background:radial-gradient(circle,rgba(108,99,255,0.15) 0%,transparent 70%);
+  border-radius:50%;
+}
+.balance-label{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:0.8px;}
+.balance-amount{font-size:36px;font-weight:800;margin:4px 0 16px;letter-spacing:-1px;color:var(--text);}
+.balance-row{display:flex;gap:12px;}
+.balance-stat{flex:1;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;}
+.balance-stat-label{font-size:10px;color:var(--text2);margin-bottom:2px;}
+.balance-stat-value{font-size:15px;font-weight:700;}
+
+/* ─── Tx items ─── */
+.tx-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+.tx-item:last-child{border-bottom:none;}
+.tx-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:var(--card2);}
+.tx-info{flex:1;min-width:0;}
+.tx-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tx-meta{font-size:11px;color:var(--text2);margin-top:2px;display:flex;gap:6px;align-items:center;}
+.tx-badge{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--card2);color:var(--text2);}
+.tx-amount{font-size:15px;font-weight:700;text-align:right;flex-shrink:0;}
+
+/* ─── Section header ─── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px;}
+.section-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;}
+.section-action{font-size:12px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;font-family:inherit;}
+
+/* ─── Account card ─── */
+.account-card{
+  border-radius:16px;padding:16px;margin-bottom:10px;
+  position:relative;overflow:hidden;color:white;
+}
+.account-card::after{
+  content:'';position:absolute;top:-20px;right:-20px;
+  width:80px;height:80px;background:rgba(255,255,255,0.1);border-radius:50%;
+}
+.ac-name{font-size:13px;font-weight:600;opacity:0.85;}
+.ac-type{font-size:10px;opacity:0.65;margin-bottom:12px;}
+.ac-balance{font-size:24px;font-weight:800;}
+.ac-actions{display:flex;gap:8px;margin-top:12px;}
+.ac-btn{padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.15);color:white;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit;}
+
+/* ─── Progress ─── */
+.progress-track{height:6px;background:var(--card2);border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width 0.5s ease;}
+
+/* ─── Budget bar ─── */
+.budget-bar-track{height:8px;background:var(--card2);border-radius:4px;overflow:hidden;margin:6px 0;}
+.budget-bar-fill{height:100%;border-radius:4px;}
+
+/* ─── Goal card ─── */
+.goal-card{background:var(--card);border-radius:16px;border:1px solid var(--border);padding:16px;margin-bottom:10px;}
+.goal-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.goal-icon{font-size:28px;}
+.goal-title{font-size:15px;font-weight:700;color:var(--text);}
+.goal-subtitle{font-size:11px;color:var(--text2);}
+.goal-amounts{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-top:6px;}
+
+/* ─── Debt card ─── */
+.debt-card{background:var(--card);border-radius:16px;border:1px solid var(--border);padding:16px;margin-bottom:10px;}
+.debt-name{font-size:15px;font-weight:700;color:var(--text);}
+.debt-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;}
+.debt-status.ok{background:rgba(74,222,128,0.15);color:var(--green);}
+.debt-status.warn{background:rgba(251,191,36,0.15);color:var(--yellow);}
+.debt-status.danger{background:rgba(248,113,113,0.15);color:var(--red);}
+
+/* ─── Stat box ─── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stat-box{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px;}
+.stat-box-label{font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.stat-box-value{font-size:20px;font-weight:800;margin-top:2px;color:var(--text);}
+.stat-box-change{font-size:11px;margin-top:4px;}
+.up{color:var(--green);}
+.down{color:var(--red);}
+
+/* ─── Alert banner ─── */
+.alert-banner{display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;margin-bottom:8px;font-size:13px;font-weight:600;}
+.alert-banner.warning{background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);color:var(--yellow);}
+.alert-banner.danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:var(--red);}
+.alert-banner.info{background:rgba(108,99,255,0.1);border:1px solid rgba(108,99,255,0.3);color:var(--accent);}
+
+/* ─── Daily limit ─── */
+.daily-limit{
+  background:linear-gradient(135deg,rgba(108,99,255,0.15),rgba(255,101,132,0.1));
+  border:1px solid rgba(108,99,255,0.25);border-radius:16px;
+  padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;
+}
+.daily-limit-label{font-size:11px;color:var(--text2);}
+.daily-limit-value{font-size:22px;font-weight:800;color:var(--accent);}
+
+/* ─── Bar chart ─── */
+.bar-chart{display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px;}
+.bar-group{flex:1;display:flex;gap:2px;align-items:flex-end;}
+.bar{flex:1;border-radius:4px 4px 0 0;min-height:4px;}
+.bar.income{background:rgba(74,222,128,0.7);}
+.bar.expense{background:rgba(248,113,113,0.7);}
+.bar-labels{display:flex;gap:6px;padding:4px 4px 0;}
+.bar-label{flex:1;text-align:center;font-size:9px;color:var(--text3);}
+
+/* ─── Modal ─── */
+.modal-overlay{
+  display:none;position:absolute;inset:0;
+  background:rgba(0,0,0,0.6);z-index:100;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  align-items:flex-end;border-radius:44px;overflow:hidden;
+}
+.modal-overlay.open{display:flex;}
+.modal-sheet{
+  background:var(--bg2);border-radius:24px 24px 0 0;
+  padding:20px 20px 36px;width:100%;max-height:80%;overflow-y:auto;
+  animation:slideUp 0.3s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
+.modal-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.5px;}
+.form-input{
+  width:100%;background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 13px;color:var(--text);
+  font-size:15px;font-family:inherit;outline:none;transition:border-color 0.2s;
+}
+.form-input:focus{border-color:var(--accent);}
+.type-selector{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.type-btn{
+  padding:12px;border-radius:10px;background:var(--card);
+  color:var(--text2);font-size:14px;font-weight:600;
+  border:2px solid transparent;cursor:pointer;text-align:center;font-family:inherit;
+}
+.type-btn.sel-income{border-color:var(--green);color:var(--green);background:rgba(74,222,128,0.1);}
+.type-btn.sel-expense{border-color:var(--red);color:var(--red);background:rgba(248,113,113,0.1);}
+.btn-primary{
+  width:100%;padding:14px;border-radius:10px;
+  background:var(--accent);color:white;
+  font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;
+  transition:opacity 0.2s,transform 0.1s;
+}
+.btn-primary:active{opacity:0.9;transform:scale(0.98);}
+
+/* ─── Splash ─── */
+.splash{
+  position:absolute;inset:0;z-index:200;
+  background:linear-gradient(160deg,#1a1000 0%,#141414 60%,#0e0e0e 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:44px;transition:opacity 0.5s ease,transform 0.5s ease;
+}
+.splash.hide{opacity:0;pointer-events:none;transform:scale(1.05);}
+.splash-logo{width:90px;height:90px;animation:splashPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both;}
+.splash-name{font-size:28px;font-weight:800;color:#e9d5ff;letter-spacing:-0.5px;margin-top:16px;animation:splashFade 0.5s ease 0.2s both;}
+.splash-sub{font-size:11px;color:#8b5cf6;letter-spacing:3px;text-transform:uppercase;margin-top:4px;animation:splashFade 0.5s ease 0.35s both;}
+.splash-bar{width:72px;height:3px;background:#252540;border-radius:2px;margin-top:36px;overflow:hidden;animation:splashFade 0.4s ease 0.4s both;}
+.splash-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#f59e0b,#d97706);border-radius:2px;animation:splashLoad 1.2s ease 0.5s forwards;}
+@keyframes splashPop{from{transform:scale(0.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+@keyframes splashFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes splashLoad{from{width:0%;}to{width:100%;}}
+
+/* ─── PIN ─── */
+.pin-screen{
+  position:absolute;inset:0;z-index:190;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 28px;border-radius:44px;
+}
+.pin-screen.hide{display:none;}
+.pin-logo{width:56px;height:56px;margin-bottom:14px;}
+.pin-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:4px;}
+.pin-subtitle{font-size:13px;color:var(--text2);margin-bottom:28px;}
+.pin-dots{display:flex;gap:14px;margin-bottom:28px;}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--text3);background:transparent;transition:all 0.2s;}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent);}
+.pin-dot.err{background:var(--red);border-color:var(--red);animation:pinShake 0.4s ease;}
+@keyframes pinShake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-5px);}40%,80%{transform:translateX(5px);}}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:260px;}
+.pin-key{
+  height:60px;border-radius:14px;
+  background:var(--card);border:1px solid var(--border);
+  color:var(--text);font-size:20px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-family:inherit;transition:background 0.15s,transform 0.1s;
+}
+.pin-key:active{background:var(--accent);color:white;transform:scale(0.95);}
+.pin-key.empty{background:transparent;border:none;pointer-events:none;}
+
+/* ─── Empty state ─── */
+.empty{text-align:center;padding:36px 20px;color:var(--text2);}
+.empty-icon{font-size:44px;margin-bottom:10px;}
+.empty-text{font-size:14px;}
+
+/* ─── Recurring alert ─── */
+.recurring-alert{
+  background:linear-gradient(135deg,rgba(108,99,255,0.12),rgba(74,222,128,0.08));
+  border:1px solid rgba(108,99,255,0.25);border-radius:16px;
+  padding:14px 16px;margin-bottom:12px;
+}
+
+/* ─── Tweaks panel ─── */
+.tweaks-panel{
+  position:absolute;bottom:100px;right:10px;z-index:300;
+  background:#1a1a2e;border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px;padding:16px;width:200px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  display:none;
+}
+.tweaks-panel.visible{display:block;}
+.tweaks-title{font-size:12px;font-weight:700;color:#9090b0;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;}
+.tweak-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.tweak-label{font-size:13px;color:#f0f0ff;font-weight:500;}
+.tweak-toggle{width:40px;height:22px;border-radius:11px;background:#252540;position:relative;cursor:pointer;flex-shrink:0;border:none;}
+.tweak-toggle.on{background:#6C63FF;}
+.tweak-toggle::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:white;border-radius:50%;transition:transform 0.2s;}
+.tweak-toggle.on::after{transform:translateX(18px);}
+.tweak-select{background:#252540;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f0f0ff;font-size:12px;padding:4px 8px;font-family:inherit;width:100%;margin-top:6px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─── Sample data ─── */
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+const ACCOUNTS = [
+  { id:1, name:'BCP Ahorros', type:'Cuenta corriente', balance:2850.00, color:'linear-gradient(135deg,#6C63FF,#a78bfa)' },
+  { id:2, name:'Interbank', type:'Tarjeta débito', balance:1430.50, color:'linear-gradient(135deg,#f59e0b,#f97316)' },
+  { id:3, name:'Yape', type:'Billetera digital', balance:0.00, color:'linear-gradient(135deg,#10b981,#059669)' },
+];
+
+const TRANSACTIONS = [
+  { id:1, icon:'🛒', name:'Supermercado Wong', cat:'Alimentación', date:'hoy', amount:-85.40, type:'expense' },
+  { id:2, icon:'🚗', name:'Uber', cat:'Transporte', date:'hoy', amount:-12.00, type:'expense' },
+  { id:3, icon:'💼', name:'Sueldo abril', cat:'Ingresos', date:'01 abr', amount:3500.00, type:'income' },
+  { id:4, icon:'🍕', name:'Pizza Hut', cat:'Restaurantes', date:'ayer', amount:-45.00, type:'expense' },
+  { id:5, icon:'💡', name:'Luz — Enel', cat:'Servicios', date:'15 abr', amount:-78.50, type:'expense' },
+  { id:6, icon:'📱', name:'Claro', cat:'Servicios', date:'10 abr', amount:-39.90, type:'expense' },
+];
+
+const GOALS = [
+  { id:1, icon:'🏠', title:'Fondo de emergencia', target:5000, saved:3100, color:'#6C63FF' },
+  { id:2, icon:'✈️', title:'Viaje a Cusco', target:1200, saved:400, color:'#FF6584' },
+  { id:3, icon:'💻', title:'Laptop nueva', target:2500, saved:800, color:'#4ade80' },
+];
+
+const DEBTS = [
+  { id:1, name:'Tarjeta BCP', type:'Crédito', limit:4000, used:3200, status:'warn', due:'15 may' },
+  { id:2, name:'Préstamo Scotiabank', type:'Préstamo', limit:10000, used:6500, status:'ok', due:'30 abr' },
+];
+
+const BUDGETS = [
+  { cat:'Alimentación', icon:'🛒', spent:340, limit:500 },
+  { cat:'Transporte', icon:'🚗', spent:120, limit:200 },
+  { cat:'Entretenimiento', icon:'🎬', spent:195, limit:200 },
+  { cat:'Servicios', icon:'💡', spent:118, limit:150 },
+];
+
+const BAR_DATA = [
+  { label:'Oct', income:2800, expense:1900 },
+  { label:'Nov', income:3200, expense:2100 },
+  { label:'Dic', income:4100, expense:3200 },
+  { label:'Ene', income:3000, expense:1800 },
+  { label:'Feb', income:3500, expense:2200 },
+  { label:'Mar', income:3500, expense:2050 },
+  { label:'Abr', income:3500, expense:1220 },
+];
+
+/* ─── Formatters ─── */
+const fmt = (n) => 'S/ ' + Math.abs(n).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 });
+
+/* ─── Budget color ─── */
+const budgetColor = (pct) => pct >= 95 ? '#f87171' : pct >= 75 ? '#fbbf24' : '#4ade80';
+
+/* ─── Components ─── */
+
+function BalanceHero({ total, income, expenses }) {
+  return (
+    <div className="hero-balance">
+      <div className="balance-label">Saldo total</div>
+      <div className="balance-amount">{fmt(total)}</div>
+      <div className="balance-row">
+        <div className="balance-stat">
+          <div className="balance-stat-label">Ingresos</div>
+          <div className="balance-stat-value" style={{color:'var(--green)'}}>+{fmt(income)}</div>
+        </div>
+        <div className="balance-stat">
+          <div className="balance-stat-label">Gastos</div>
+          <div className="balance-stat-value" style={{color:'var(--red)'}}>-{fmt(expenses)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TxItem({ tx }) {
+  return (
+    <div className="tx-item">
+      <div className="tx-icon">{tx.icon}</div>
+      <div className="tx-info">
+        <div className="tx-name">{tx.name}</div>
+        <div className="tx-meta">
+          <span className="tx-badge">{tx.cat}</span>
+          <span>· {tx.date}</span>
+        </div>
+      </div>
+      <div className="tx-amount" style={{color: tx.type==='income' ? 'var(--green)' : 'var(--red)'}}>
+        {tx.type==='income' ? '+' : '-'}{fmt(tx.amount)}
+      </div>
+    </div>
+  );
+}
+
+function HomeScreen({ onNav }) {
+  const total = 4280.50, income = 3500, expenses = 1220;
+  return (
+    <div className="screen">
+      <div className="screen-inner" style={{paddingTop:12}}>
+        <div className="alert-banner warning">⚠️ Entretenimiento casi al límite — S/ 5 restantes</div>
+        <div className="daily-limit">
+          <div>
+            <div className="daily-limit-label">Límite diario disponible</div>
+            <div className="daily-limit-value">S/ 120.00</div>
+          </div>
+          <span style={{fontSize:28}}>📅</span>
+        </div>
+        <BalanceHero total={total} income={income} expenses={expenses} />
+
+        <div className="section-header">
+          <span className="section-title">Cuentas</span>
+          <button className="section-action" onClick={()=>onNav('accounts')}>Ver todas</button>
+        </div>
+        <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:4}}>
+          {ACCOUNTS.map(a=>(
+            <div key={a.id} style={{background:a.color,borderRadius:14,padding:14,minWidth:150,color:'white',flexShrink:0,position:'relative',overflow:'hidden'}}>
+              <div style={{position:'absolute',top:-16,right:-16,width:60,height:60,background:'rgba(255,255,255,0.1)',borderRadius:'50%'}}></div>
+              <div style={{fontSize:12,fontWeight:600,opacity:0.85}}>{a.name}</div>
+              <div style={{fontSize:10,opacity:0.6,marginBottom:8}}>{a.type}</div>
+              <div style={{fontSize:20,fontWeight:800}}>{fmt(a.balance)}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="section-header">
+          <span className="section-title">Presupuesto del mes</span>
+        </div>
+        <div className="card card-sm">
+          {BUDGETS.map(b=>{
+            const pct = Math.round(b.spent/b.limit*100);
+            return (
+              <div key={b.cat} style={{paddingBottom:10,marginBottom:10,borderBottom:'1px solid var(--border)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                  <span style={{fontSize:14,fontWeight:600,color:'var(--text)',display:'flex',alignItems:'center',gap:6}}>{b.icon} {b.cat}</span>
+                  <span style={{fontSize:11,color:'var(--text2)'}}>{pct}%</span>
+                </div>
+                <div className="budget-bar-track">
+                  <div className="budget-bar-fill" style={{width:`${pct}%`,background:budgetColor(pct)}}></div>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text2)',marginTop:3}}>
+                  <span>{fmt(b.spent)} gastado</span><span>/ {fmt(b.limit)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="section-header">
+          <span className="section-title">Movimientos recientes</span>
+          <button className="section-action" onClick={()=>onNav('more')}>Ver todo</button>
+        </div>
+        <div className="card card-sm" style={{marginBottom:8}}>
+          {TRANSACTIONS.slice(0,4).map(tx=><TxItem key={tx.id} tx={tx}/>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountsScreen() {
+  return (
+    <div className="screen">
+      <div className="screen-inner" style={{paddingTop:12}}>
+        {ACCOUNTS.map(a=>(
+          <div key={a.id} className="account-card" style={{background:a.color}}>
+            <div className="ac-name">{a.name}</div>
+            <div className="ac-type">{a.type}</div>
+            <div className="ac-balance">{fmt(a.balance)}</div>
+            <div className="ac-actions">
+              <button className="ac-btn">+ Depositar</button>
+              <button className="ac-btn">→ Transferir</button>
+            </div>
+          </div>
+        ))}
+        <div className="card" style={{textAlign:'center',padding:'20px 16px',cursor:'pointer',borderStyle:'dashed'}}>
+          <div style={{fontSize:28,marginBottom:6}}>+</div>
+          <div style={{fontSize:14,fontWeight:600,color:'var(--text2)'}}>Nueva cuenta</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DebtsScreen() {
+  return (
+    <div className="screen">
+      <div className="screen-inner" style={{paddingTop:12}}>
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:8}}>Resumen de deudas</div>
+          <div style={{fontSize:30,fontWeight:800,color:'var(--red)'}}>S/ 9,700.00</div>
+          <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>En 2 deudas activas</div>
+        </div>
+
+        <div className="section-header">
+          <span className="section-title">Tarjetas de crédito</span>
+          <button className="section-action">+ Agregar</button>
+        </div>
+        {DEBTS.map(d=>{
+          const pct = Math.round(d.used/d.limit*100);
+          return (
+            <div key={d.id} className="debt-card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                <div className="debt-name">{d.name}</div>
+                <span className={`debt-status ${d.status}`}>{d.status==='ok'?'Al día':'Por vencer'}</span>
+              </div>
+              <div style={{height:8,background:'var(--card2)',borderRadius:4,overflow:'hidden',marginBottom:6}}>
+                <div style={{height:'100%',borderRadius:4,background:d.status==='ok'?'var(--accent)':'var(--yellow)',width:`${pct}%`}}></div>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--text2)'}}>
+                <span>{fmt(d.used)} usado</span>
+                <span>Límite: {fmt(d.limit)}</span>
+              </div>
+              <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>Vence: {d.due}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GoalsScreen() {
+  return (
+    <div className="screen">
+      <div className="screen-inner" style={{paddingTop:12}}>
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:6}}>Proyección de ahorro</div>
+          <div style={{fontSize:13,color:'var(--text2)'}}>A este ritmo alcanzarás <strong style={{color:'var(--green)'}}>2 de 3</strong> metas en los próximos 6 meses.</div>
+        </div>
+        <div className="section-header">
+          <span className="section-title">Mis metas</span>
+          <button className="section-action">+ Nueva</button>
+        </div>
+        {GOALS.map(g=>{
+          const pct = Math.round(g.saved/g.target*100);
+          return (
+            <div key={g.id} className="goal-card">
+              <div className="goal-header">
+                <span className="goal-icon">{g.icon}</span>
+                <div>
+                  <div className="goal-title">{g.title}</div>
+                  <div className="goal-subtitle">Meta: {fmt(g.target)}</div>
+                </div>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{width:`${pct}%`,background:g.color}}></div>
+              </div>
+              <div className="goal-amounts">
+                <span>{fmt(g.saved)} ahorrados</span>
+                <span style={{fontWeight:700,color:g.color}}>{pct}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatsScreen() {
+  const maxVal = Math.max(...BAR_DATA.flatMap(d=>[d.income,d.expense]));
+  return (
+    <div className="screen">
+      <div className="screen-inner" style={{paddingTop:12}}>
+        <div className="stat-grid">
+          <div className="stat-box">
+            <div className="stat-box-label">Ingresos</div>
+            <div className="stat-box-value" style={{color:'var(--green)'}}>S/ 3,500</div>
+            <div className="stat-box-change up">= mismo que mar</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-box-label">Gastos</div>
+            <div className="stat-box-value" style={{color:'var(--red)'}}>S/ 1,220</div>
+            <div className="stat-box-change up">▼ 40% vs mar</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-box-label">Ahorro neto</div>
+            <div className="stat-box-value">S/ 2,280</div>
+            <div className="stat-box-change up">▲ 65% vs mar</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-box-label">Transacciones</div>
+            <div className="stat-box-value">24</div>
+            <div className="stat-box-change down">▼ 3 vs mar</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">
+            Ingresos vs Gastos
+            <div style={{display:'flex',gap:10,fontSize:10}}>
+              <span style={{color:'var(--green)'}}>■ Ingresos</span>
+              <span style={{color:'var(--red)'}}>■ Gastos</span>
+            </div>
+          </div>
+          <div className="bar-chart">
+            {BAR_DATA.map(d=>(
+              <div key={d.label} className="bar-group">
+                <div className="bar income" style={{height:`${d.income/maxVal*100}%`}}></div>
+                <div className="bar expense" style={{height:`${d.expense/maxVal*100}%`}}></div>
+              </div>
+            ))}
+          </div>
+          <div className="bar-labels">
+            {BAR_DATA.map(d=><div key={d.label} className="bar-label">{d.label}</div>)}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">Top categorías</div>
+          {[
+            {name:'Alimentación',pct:28,amount:340,color:'#6C63FF'},
+            {name:'Transporte',pct:10,amount:120,color:'#FF6584'},
+            {name:'Entretenimiento',pct:16,amount:195,color:'#fbbf24'},
+            {name:'Servicios',pct:10,amount:118,color:'#4ade80'},
+          ].map(c=>(
+            <div key={c.name} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+              <div style={{width:10,height:10,borderRadius:3,background:c.color,flexShrink:0}}></div>
+              <div style={{flex:1,fontSize:13,color:'var(--text)'}}>{c.name}</div>
+              <div style={{fontSize:12,color:'var(--text2)',fontWeight:600}}>{c.pct}%</div>
+              <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{fmt(c.amount)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoreScreen() {
+  return (
+    <div className="screen">
+      <div className="screen-inner" style={{paddingTop:12}}>
+        <div className="section-header">
+          <span className="section-title">Gastos fijos</span>
+          <button className="section-action">+ Agregar</button>
+        </div>
+        <div className="card card-sm">
+          {[
+            {icon:'🏠',name:'Alquiler',day:'1ro de cada mes',amount:1200},
+            {icon:'💡',name:'Luz — Enel',day:'15 de cada mes',amount:78.50},
+            {icon:'📱',name:'Claro',day:'10 de cada mes',amount:39.90},
+            {icon:'🌐',name:'Internet',day:'20 de cada mes',amount:89.90},
+          ].map(f=>(
+            <div key={f.name} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+              <div style={{width:40,height:40,borderRadius:12,background:'var(--card2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{f.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:600,color:'var(--text)'}}>{f.name}</div>
+                <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>{f.day}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{fmt(f.amount)}</div>
+                <button style={{marginTop:4,padding:'3px 8px',borderRadius:6,background:'rgba(74,222,128,0.15)',color:'var(--green)',fontSize:10,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit'}}>Pagado</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="section-header">
+          <span className="section-title">Historial completo</span>
+        </div>
+        <div style={{position:'relative',marginBottom:10}}>
+          <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>🔍</span>
+          <input style={{width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px 10px 36px',color:'var(--text)',fontSize:13,fontFamily:'Plus Jakarta Sans, sans-serif',outline:'none'}} placeholder="Buscar movimientos..." />
+        </div>
+        <div className="card card-sm">
+          {TRANSACTIONS.map(tx=><TxItem key={tx.id} tx={tx}/>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Add Transaction Modal ─── */
+function AddTxModal({ open, onClose }) {
+  const [txType, setTxType] = useState('expense');
+  const [amount, setAmount] = useState('');
+  const [desc, setDesc] = useState('');
+
+  return (
+    <div className={`modal-overlay ${open?'open':''}`} onClick={e=>{if(e.target.classList.contains('modal-overlay'))onClose();}}>
+      <div className="modal-sheet">
+        <div className="modal-handle"></div>
+        <div className="modal-title">Nuevo movimiento</div>
+        <div className="type-selector">
+          <button className={`type-btn ${txType==='income'?'sel-income':''}`} onClick={()=>setTxType('income')}>💰 Ingreso</button>
+          <button className={`type-btn ${txType==='expense'?'sel-expense':''}`} onClick={()=>setTxType('expense')}>💸 Gasto</button>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Monto (S/)</label>
+          <input className="form-input" type="number" placeholder="0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Descripción</label>
+          <input className="form-input" placeholder="Ej: Supermercado Wong" value={desc} onChange={e=>setDesc(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Categoría</label>
+          <select className="form-input">
+            <option>Alimentación</option>
+            <option>Transporte</option>
+            <option>Entretenimiento</option>
+            <option>Servicios</option>
+            <option>Salud</option>
+            <option>Otros</option>
+          </select>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+          <div>
+            <label className="form-label">Cuenta</label>
+            <select className="form-input">
+              <option>BCP Ahorros</option>
+              <option>Interbank</option>
+              <option>Yape</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Fecha</label>
+            <input className="form-input" type="date" defaultValue="2026-04-22" />
+          </div>
+        </div>
+        <button className="btn-primary" onClick={onClose}>Guardar movimiento</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PIN Screen ─── */
+function PinScreen({ onUnlock }) {
+  const [digits, setDigits] = useState([]);
+  const correct = ['1','2','3','4'];
+
+  const press = (d) => {
+    if(digits.length>=4) return;
+    const next = [...digits,d];
+    setDigits(next);
+    if(next.length===4){
+      if(JSON.stringify(next)===JSON.stringify(correct)){
+        setTimeout(()=>onUnlock(), 200);
+      } else {
+        setTimeout(()=>setDigits([]), 600);
+      }
+    }
+  };
+  const del = () => setDigits(d=>d.slice(0,-1));
+
+  return (
+    <div className="pin-screen">
+      <img className="pin-logo" src="../../assets/qori-logo.svg" alt="Qori" onError={e=>{e.target.style.display='none';}} />
+      <div className="pin-title" style={{color:'#fbbf24'}}>Qori</div>
+      <div className="pin-subtitle">Ingresa tu PIN (1234)</div>
+      <div className="pin-dots">
+        {[0,1,2,3].map(i=><div key={i} className={`pin-dot ${i<digits.length?'filled':''}`}></div>)}
+      </div>
+      <div className="pin-grid">
+        {['1','2','3','4','5','6','7','8','9'].map(n=>(
+          <button key={n} className="pin-key" onClick={()=>press(n)}>{n}</button>
+        ))}
+        <button className="pin-key empty"></button>
+        <button className="pin-key" onClick={()=>press('0')}>0</button>
+        <button className="pin-key" style={{fontSize:18,color:'var(--text2)'}} onClick={del}>⌫</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main App ─── */
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('fc_theme') || 'dark');
+  const [screen, setScreen] = useState('home');
+  const [splash, setSplash] = useState(true);
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [month, setMonth] = useState(3); // April
+  const [modalOpen, setModalOpen] = useState(false);
+  const [tweaksVisible, setTweaksVisible] = useState(false);
+
+  useEffect(()=>{
+    const t = setTimeout(()=>setSplash(false), 2000);
+    return ()=>clearTimeout(t);
+  },[]);
+
+  useEffect(()=>{
+    localStorage.setItem('fc_theme', theme);
+  },[theme]);
+
+  // Tweaks panel toggle via parent postMessage
+  useEffect(()=>{
+    const handler = (e)=>{
+      if(e.data?.type==='__activate_edit_mode') setTweaksVisible(true);
+      if(e.data?.type==='__deactivate_edit_mode') setTweaksVisible(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return ()=>window.removeEventListener('message',handler);
+  },[]);
+
+  const NAV = [
+    {id:'home',icon:'🏠',label:'Inicio'},
+    {id:'accounts',icon:'🏦',label:'Cuentas'},
+    {id:'debts',icon:'💳',label:'Deudas'},
+    {id:'goals',icon:'🎯',label:'Metas'},
+    {id:'stats',icon:'📊',label:'Resumen'},
+    {id:'more',icon:'☰',label:'Más'},
+  ];
+
+  const screenComp = {
+    home: <HomeScreen onNav={setScreen}/>,
+    accounts: <AccountsScreen/>,
+    debts: <DebtsScreen/>,
+    goals: <GoalsScreen/>,
+    stats: <StatsScreen/>,
+    more: <MoreScreen/>,
+  };
+
+  const topbarTitles = {
+    home:'Qori', accounts:'Cuentas', debts:'Deudas',
+    goals:'Metas de ahorro', stats:'Resumen', more:'Más',
+  };
+  const topbarSubs = {
+    home:'Tu oro financiero', accounts:'Gestión de cuentas',
+    debts:'Control de deudas', goals:'Seguimiento de metas',
+    stats:'Análisis financiero', more:'Historial y herramientas',
+  };
+
+  return (
+    <div className={`phone-frame ${theme}`}>
+      {/* Splash */}
+      <div className={`splash ${!splash?'hide':''}`}>
+        <img className="splash-logo" src="../../assets/qori-logo.svg" alt="Qori" onError={e=>{e.target.style.display='none';}} />
+        <div className="splash-name" style={{color:'#fbbf24'}}>Qori</div>
+        <div className="splash-sub">Finanzas Personales</div>
+        <div className="splash-bar"><div className="splash-bar-fill"></div></div>
+      </div>
+
+      {/* PIN */}
+      {!splash && !pinUnlocked && <PinScreen onUnlock={()=>setPinUnlocked(true)}/>}
+
+      {/* App */}
+      <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden',opacity: pinUnlocked?1:0, transition:'opacity 0.3s'}}>
+        {/* Topbar */}
+        <div className="topbar">
+          <div className="tb-logo">
+            <img className="tb-logo-img" src="../../assets/qori-logo.svg" alt="Qori" onError={e=>{e.target.style.display='none';}} />
+            <div>
+              <div className="tb-title">{topbarTitles[screen]}</div>
+              <div className="tb-sub">{topbarSubs[screen]}</div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:7}}>
+            <button className="icon-btn" onClick={()=>setTheme(t=>t==='dark'?'light':'dark')}>
+              {theme==='dark'?'☀️':'🌙'}
+            </button>
+            <button className="icon-btn">⚙️</button>
+          </div>
+        </div>
+
+        {/* Month nav */}
+        <div className="month-nav">
+          <button className="mn-btn" onClick={()=>setMonth(m=>(m-1+12)%12)}>‹</button>
+          <span className="mn-label">{MONTHS[month]} 2026</span>
+          <button className="mn-btn" onClick={()=>setMonth(m=>(m+1)%12)}>›</button>
+        </div>
+
+        {/* Active screen */}
+        {screenComp[screen]}
+
+        {/* Bottom nav */}
+        <nav className="bottom-nav">
+          {NAV.map(n=>(
+            <button key={n.id} className={`nav-item ${screen===n.id?'active':''}`} onClick={()=>setScreen(n.id)}>
+              <span className="nav-icon">{n.icon}</span>
+              <span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* FAB */}
+      {pinUnlocked && (
+        <button className="fab" onClick={()=>setModalOpen(true)}>+</button>
+      )}
+
+      {/* Add Tx Modal */}
+      <AddTxModal open={modalOpen} onClose={()=>setModalOpen(false)} />
+
+      {/* Tweaks panel */}
+      <div className={`tweaks-panel ${tweaksVisible?'visible':''}`}>
+        <div className="tweaks-title">Tweaks</div>
+        <div className="tweak-row">
+          <span className="tweak-label">Modo oscuro</span>
+          <button className={`tweak-toggle ${theme==='dark'?'on':''}`} onClick={()=>setTheme(t=>t==='dark'?'light':'dark')}></button>
+        </div>
+        <div className="tweak-row">
+          <span className="tweak-label">Pantalla</span>
+        </div>
+        <select className="tweak-select" value={screen} onChange={e=>setScreen(e.target.value)}>
+          {NAV.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
