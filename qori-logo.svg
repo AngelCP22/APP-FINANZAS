@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f59e0b"></stop>
+      <stop offset="1" stop-color="#d97706"></stop>
+    </linearGradient>
+    <linearGradient id="coin" x1="55" y1="55" x2="145" y2="145" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.25)"></stop>
+      <stop offset="1" stop-color="rgba(255,255,255,0.08)"></stop>
+    </linearGradient>
+  </defs>
+  
+  <rect width="200" height="200" rx="50" fill="url(#bg)"></rect>
+  
+  <circle cx="100" cy="100" r="58" fill="url(#coin)" stroke="rgba(255,255,255,0.35)" stroke-width="3"></circle>
+  
+  <circle cx="100" cy="100" r="46" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"></circle>
+  
+  <text x="100" y="118" text-anchor="middle" font-family="&#39;Plus Jakarta Sans&#39;, system-ui, sans-serif" font-size="48" font-weight="800" fill="white" style="letter-spacing:-1px">S/</text>
+  
+  <ellipse cx="72" cy="70" rx="10" ry="5" fill="rgba(255,255,255,0.25)" transform="rotate(-30 72 70)"></ellipse>
+</svg>
